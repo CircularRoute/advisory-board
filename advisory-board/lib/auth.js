@@ -51,6 +51,13 @@ function isEnabled() {
   return allowedEmails().length > 0 && !!apiKey && !!sender;
 }
 
+// The admin (BOARD_ADMIN_EMAIL, set in the Render environment) additionally
+// sees the history of all questions: who asked, the final response, the cost.
+function isAdminEmail(email) {
+  const admin = (envSecret('BOARD_ADMIN_EMAIL') || '').trim().toLowerCase();
+  return !!admin && !!email && admin === String(email).trim().toLowerCase();
+}
+
 function configProblems() {
   const problems = [];
   if (allowedEmails().length > 0) {
@@ -245,6 +252,7 @@ module.exports = {
   COOKIE_NAME,
   SESSION_TTL_MS,
   isEnabled,
+  isAdminEmail,
   configProblems,
   allowedEmails,
   requestLink,

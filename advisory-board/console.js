@@ -80,6 +80,7 @@ async function startRun(opts) {
         keys: loadKeys(),
         log: (m) => broadcast({ type: 'log', tier, line: m }),
       });
+      run.askedBy = opts.askedBy || null; // who convened this board (admin history)
       const dir = saveRun(run);
       broadcast({ type: 'run-done', tier, dir: path.basename(dir) });
       results.push({ tier, dir: path.basename(dir), run });
@@ -199,6 +200,41 @@ function listRuns(limit = 25) {
   }
   return out;
 }
+// Admin: locally (no auth) the single user is the admin; hosted, only the
+// magic-link session whose email matches BOARD_ADMIN_EMAIL.
+function isAdminReq(req) {
+  if (!HOSTED) return true;
+  return auth.isAdminEmail(auth.sessionEmail(req.headers.cookie));
+}
+
+// The full record every question leaves behind, for the admin view: who
+// asked, the question, the final response, and what it cost us.
+function listHistory() {
+  if (!existsSync(RUNS_DIR)) return [];
+  const dirs = readdirSync(RUNS_DIR, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && d.name !== 'comparisons')
+    .map((d) => d.name)
+    .sort()
+    .reverse();
+  const out = [];
+  for (const dir of dirs) {
+    try {
+      const r = JSON.parse(readFileSync(path.join(RUNS_DIR, dir, 'run.json'), 'utf8'));
+      out.push({
+        dir,
+        at: r.finishedAt,
+        title: r.title,
+        question: r.question || '',
+        askedBy: r.askedBy || null,
+        tier: r.tier,
+        costUsd: r.cost ? r.cost.totalUsd : null,
+        outOfPocketUsd: r.cost ? r.cost.outOfPocketUsd : null,
+      });
+    } catch { /* skip unreadable run dirs */ }
+  }
+  return out;
+}
+
 function safeRunFile(dirName, file) {
   // dir names are our own stamp-slug format; refuse anything path-like
   if (!/^[a-z0-9-]+$/i.test(dirName)) return null;
@@ -286,7 +322,13 @@ ${ok
 
   if (req.method === 'GET' && u.pathname === '/auth/me') {
     const email = MAGIC ? auth.sessionEmail(req.headers.cookie) : null;
-    return json(res, 200, { authed: authed(req, u), email, magic: MAGIC, hosted: HOSTED });
+    return json(res, 200, {
+      authed: authed(req, u),
+      email,
+      admin: isAdminReq(req),
+      magic: MAGIC,
+      hosted: HOSTED,
+    });
   }
 
   if (req.method === 'POST' && u.pathname === '/auth/logout') {
@@ -315,6 +357,11 @@ ${ok
 
   if (req.method === 'GET' && u.pathname === '/api/runs') {
     return json(res, 200, listRuns());
+  }
+
+  if (req.method === 'GET' && u.pathname === '/api/history') {
+    if (!isAdminReq(req)) return json(res, 403, { error: 'admin only' });
+    return json(res, 200, listHistory());
   }
 
   if (req.method === 'GET' && u.pathname === '/api/report') {
@@ -386,7 +433,9 @@ ${ok
           if (!keys[p]) return json(res, 400, { error: `No API key configured for ${p}.` });
         }
       } catch (err) { return json(res, 500, { error: err.message }); }
-      startRun({ question: String(opts.question), tier, providers: opts.providers.map(String), chairman: opts.chairman || null, compare });
+      const askedBy =
+        (MAGIC && auth.sessionEmail(req.headers.cookie)) || (HOSTED ? 'access-key' : 'local');
+      startRun({ question: String(opts.question), tier, providers: opts.providers.map(String), chairman: opts.chairman || null, compare, askedBy });
       json(res, 202, { ok: true });
     });
     return;

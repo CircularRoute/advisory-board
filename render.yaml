@@ -34,6 +34,10 @@ services:
       # edit the list here to authorize or remove people.
       - key: BOARD_ALLOWED_EMAILS
         sync: false
+      # The admin account: sees the history of all questions (who asked,
+      # final response, cost). Must also be on BOARD_ALLOWED_EMAILS.
+      - key: BOARD_ADMIN_EMAIL
+        sync: false
       - key: BREVO_API_KEY
         sync: false
       # Verified Brevo sender for magic-link emails (tested 2026-08-05).

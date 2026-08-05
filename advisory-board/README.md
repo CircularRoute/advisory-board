@@ -38,6 +38,14 @@ Two modes, decided by whether any auth is configured:
   - **Magic-link email sign-in (primary):** set `BOARD_ALLOWED_EMAILS` (comma-separated allowlist) plus `BREVO_API_KEY` and `BREVO_SENDER_EMAIL` (or `BOARD_MAGIC_FROM`). The console shows an email form; authorized addresses receive a single-use link (15 min TTL, sent via Brevo's HTTP API) and the open page **polls and signs itself in when the link is tapped anywhere** - required for the installed PWA on iOS, whose cookie jar is separate from Safari's. Sessions last 90 days and persist on disk across redeploys. Unknown addresses get the same generic response (no allowlist enumeration); link requests are rate-limited.
   - **Access key (fallback / scripts):** `BOARD_ACCESS_KEY` via `Authorization: Bearer` or `?key=`.
 
+### Admin account
+
+Set `BOARD_ADMIN_EMAIL` (Render environment) to one of the allowed emails. When that
+account signs in it sees an extra **All questions** card: every question ever put to
+the board, who asked it, when, at which tier, what it cost (with the out-of-pocket
+share), and one tap to the full report including the final response. Locally (no
+auth) the single user is the admin.
+
 ### Install on a phone (PWA)
 
 The console ships a web-app manifest and icons: open the site in the phone browser, then **Add to Home Screen** (iOS Safari: Share → Add to Home Screen; Android Chrome: menu → Add to Home screen / Install). It opens standalone under its own icon, no URL typing. Anyone whose email is on `BOARD_ALLOWED_EMAILS` can install it on their own phone and sign in the same way.

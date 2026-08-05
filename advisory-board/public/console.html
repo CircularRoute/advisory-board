@@ -65,7 +65,7 @@
 
   .seg { display: inline-flex; flex-wrap: wrap; background: var(--tint); border-radius: 11px; padding: 3px; gap: 2px; }
   .seg button { border: 0; background: transparent; color: var(--ink); font: 600 14px var(--sans); padding: 8px 18px; border-radius: 8px; cursor: pointer; transition: background .15s, box-shadow .15s; }
-  .seg button[aria-pressed="true"] { background: #fff; box-shadow: var(--shadow-pill); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; box-shadow: var(--shadow-pill); }
   button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   .seat { display: flex; align-items: center; gap: 11px; padding: 12px 13px; background: var(--tint); border-radius: 13px; margin-bottom: 9px; transition: opacity .15s; }
@@ -88,7 +88,7 @@
 
   .qhead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
   .qhead label { display: block; font: 600 15px var(--sans); margin-bottom: 9px; }
-  .micbtn { font: 600 13px var(--sans); padding: 8px 16px; border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 999px; cursor: pointer; flex: none; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+  .micbtn { display: block; width: 100%; margin-top: 10px; font: 600 14px var(--sans); padding: 13px 16px; border: 1px solid #C4E0CF; background: var(--ok-bg); color: var(--ok-ink); border-radius: 12px; cursor: pointer; }
   .micbtn.rec { background: var(--err-bg); color: var(--err-ink); border-color: var(--err-ink); animation: micpulse 1.2s infinite; }
   .micbtn[disabled] { opacity: 0.6; cursor: wait; }
   @keyframes micpulse { 50% { opacity: 0.55; } }
@@ -105,8 +105,8 @@
   .banner.ok { background: var(--ok-bg); color: var(--ok-ink); }
   .banner.err { background: var(--err-bg); color: var(--err-ink); }
 
-  .runbtn { width: 100%; margin-top: 16px; padding: 16px; font: 600 16px var(--sans); background: var(--ink); color: #fff; border: none; border-radius: 13px; cursor: pointer; transition: background .15s, transform .06s, opacity .15s; }
-  .runbtn:hover:not([disabled]) { background: #000; }
+  .runbtn { width: 100%; margin-top: 16px; padding: 16px; font: 600 16px var(--sans); background: var(--accent); color: #fff; border: none; border-radius: 13px; cursor: pointer; transition: background .15s, transform .06s, opacity .15s; }
+  .runbtn:hover:not([disabled]) { background: #176B3E; }
   .runbtn:active:not([disabled]) { transform: scale(0.99); }
   .runbtn[disabled] { opacity: 0.35; cursor: not-allowed; }
 
@@ -133,6 +133,9 @@
   .runlist .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .runlist .mono { font: 500 11.5px var(--mono); color: var(--ink-soft); flex: none; font-variant-numeric: tabular-nums; }
   .runlist .flag { color: var(--warn-ink); font-weight: 700; }
+  .runlist li.hrow { display: block; }
+  .hrow .q { display: block; font-weight: 600; white-space: normal; line-height: 1.45; }
+  .hrow .sub { font: 500 11.5px var(--mono); color: var(--ink-soft); }
 
   dialog { max-width: 760px; width: 92vw; border: none; border-radius: 20px; background: #fff; color: var(--ink); padding: 26px 30px; box-shadow: 0 24px 80px rgba(0,0,0,.3); }
   dialog::backdrop { background: rgba(0,0,0,0.4); backdrop-filter: blur(3px); }
@@ -221,11 +224,9 @@
           <div class="hint">Calibrate runs the same question past two or three boards at different capability tiers and reports, side by side, whether the pricier board actually reached a different conclusion — or only cost more. Use it occasionally to learn which tier your kind of question needs. Cost multiplies by the number of tiers.</div>
         </div>
         <div class="field">
-          <div class="qhead">
-            <label for="q">The question</label>
-            <button type="button" id="micBtn" class="micbtn" title="Dictate with the microphone - transcribed by OpenAI (about half a cent per minute)">&#127908; Dictate</button>
-          </div>
+          <label for="q">The question</label>
           <textarea id="q" placeholder="A hard, decision-shaped question. Give context: what the company is, the constraint, what a useful answer decides. Type it or press Dictate."></textarea>
+          <button type="button" id="micBtn" class="micbtn" title="Dictate with the microphone - transcribed by OpenAI (about half a cent per minute)">&#127908; Dictate the question</button>
           <div class="hint">Never convene the board on a question a single model would answer just as well.</div>
         </div>
       </div>
@@ -233,6 +234,12 @@
       <div class="card">
         <h2>Past runs</h2>
         <ul class="runlist" id="runlist"><li>Loading...</li></ul>
+      </div>
+
+      <div class="card" id="adminCard" hidden>
+        <h2>All questions — admin</h2>
+        <ul class="runlist" id="historyList"><li>Loading...</li></ul>
+        <div class="hint">Every question put to the board: who asked it, when, at which tier, and what it cost. Tap a row for the full report including the final response. Visible only to the admin account.</div>
       </div>
     </div>
 
@@ -249,7 +256,7 @@
       <div class="card">
         <h2>Tier table ($ per 1M tokens)</h2>
         <div class="tablewrap"><table>
-          <thead><tr><th>Tier</th><th>OpenAI</th><th>Anthropic</th><th>Google (out-of-pocket)</th></tr></thead>
+          <thead><tr><th>Tier</th><th>OpenAI</th><th>Anthropic</th><th>Gemini (out-of-pocket)</th></tr></thead>
           <tbody id="priceRows"></tbody>
         </table></div>
       </div>
@@ -348,8 +355,9 @@
     throw err;
   }
 
-  // Signed-in indicator (magic-link sessions only)
+  // Signed-in indicator (magic-link sessions only) + admin history
   fetch('/auth/me').then((r) => r.json()).then((me) => {
+    if (me.admin) loadAdminHistory();
     if (me.email) {
       const el = document.createElement('span');
       el.className = 'who';
@@ -367,7 +375,7 @@
   const CHAIR_DEFAULT = { top: 'mid', mid: 'top', low: 'mid' };
   const PROVIDERS = ['anthropic', 'openai', 'google'];
   const PCOLOR = { anthropic: 'var(--anthropic)', openai: 'var(--openai)', google: 'var(--google)' };
-  const PLABEL = { anthropic: 'Anthropic', openai: 'OpenAI', google: 'Google' };
+  const PLABEL = { anthropic: 'Anthropic', openai: 'OpenAI', google: 'Gemini' };
   const EST = { opinionIn: 350, opinionOut: 2500, reviewOut: 2000, chairOut: 2800 };
 
   // defaultProviders entries are "provider" or "provider:tier" (a seat pinned
@@ -485,7 +493,7 @@
     for (const t of tiersToRun) { const e = estimateRun(t); prepaid += e.prepaid; oop += e.oop; }
     $('estimate').innerHTML =
       '<div class="stat-row"><span class="k">Estimated' + (tiersToRun.length > 1 ? ' (' + tiersToRun.length + ' runs)' : '') + ', prepaid credit</span><span class="v">' + fmt(prepaid) + '</span></div>' +
-      '<div class="stat-row"><span class="k">Out-of-pocket (Google)</span><span class="v' + (oop > 0 ? ' oop' : '') + '">' + fmt(oop) + '</span></div>' +
+      '<div class="stat-row"><span class="k">Out-of-pocket (Gemini)</span><span class="v' + (oop > 0 ? ' oop' : '') + '">' + fmt(oop) + '</span></div>' +
       '<div class="stat-row total"><span class="k">Total, roughly</span><span class="v">' + fmt(prepaid + oop) + '</span></div>' +
       '<div class="hint">Rough estimate only; the real cost is printed after the run.</div>';
 
@@ -516,11 +524,33 @@
       (r.shortHanded ? '<span class="mono flag">short-handed</span>' : '') +
       '<span class="mono">' + (r.costUsd != null ? '$' + r.costUsd.toFixed(2) : '') + '</span></li>'
     ).join('');
-    el.querySelectorAll('li[data-dir]').forEach((li) => li.addEventListener('click', async () => {
-      const text = await (await apiFetch('/api/report?dir=' + encodeURIComponent(li.dataset.dir))).text();
-      $('reportBody').innerHTML = md(text);
-      $('reportDlg').showModal();
-    }));
+    el.querySelectorAll('li[data-dir]').forEach((li) => li.addEventListener('click', () => openReport(li.dataset.dir)));
+  }
+  async function openReport(dir) {
+    const text = await (await apiFetch('/api/report?dir=' + encodeURIComponent(dir))).text();
+    $('reportBody').innerHTML = md(text);
+    $('reportDlg').showModal();
+  }
+
+  // Admin: the history of all questions - who asked, when, tier, cost.
+  async function loadAdminHistory() {
+    $('adminCard').hidden = false;
+    try {
+      const hist = await (await apiFetch('/api/history')).json();
+      const el = $('historyList');
+      if (!hist.length) { el.innerHTML = '<li>No runs yet.</li>'; return; }
+      el.innerHTML = hist.map((h) =>
+        '<li class="hrow" data-dir="' + esc(h.dir) + '"><span class="q">' +
+        esc(h.question.length > 160 ? h.question.slice(0, 160) + '…' : h.question) + '</span>' +
+        '<span class="sub">' + esc(h.askedBy || 'unknown') + ' · ' +
+        esc((h.at || '').slice(0, 16).replace('T', ' ')) + ' · ' + esc(h.tier) +
+        (h.costUsd != null ? ' · $' + h.costUsd.toFixed(2) + (h.outOfPocketUsd ? ' (oop $' + h.outOfPocketUsd.toFixed(2) + ')' : '') : '') +
+        '</span></li>'
+      ).join('');
+      el.querySelectorAll('li[data-dir]').forEach((li) => li.addEventListener('click', () => openReport(li.dataset.dir)));
+    } catch {
+      $('historyList').innerHTML = '<li>Could not load history.</li>';
+    }
   }
   $('dlgClose').addEventListener('click', () => $('reportDlg').close());
 
@@ -562,7 +592,7 @@
         } catch (err) {
           micErr(err.message);
         }
-        micBtn.disabled = false; micBtn.innerHTML = '&#127908; Dictate';
+        micBtn.disabled = false; micBtn.innerHTML = '&#127908; Dictate the question';
       };
       rec.start();
       startedAt = Date.now();
