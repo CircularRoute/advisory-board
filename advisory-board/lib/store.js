@@ -46,6 +46,9 @@ function renderReport(run) {
 ## Question
 
 ${run.question}
+${run.context ? `
+**Context attached:** ${run.context.name} (${run.context.chars.toLocaleString('en-US')} characters) - every member, reviewer and the chairman received it with the question. Full text in run.json.
+` : ''}
 
 ## Final answer (Chairman synthesis)
 

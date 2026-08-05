@@ -26,6 +26,10 @@ console, magic-link auth + PWA, extended boards with roles, live session screen)
     structured `onEvent` stream for the live UI. The no-role state is labeled "Default"
     in the UI (renamed from "Objective", 2026-08-05).
   - `lib/auth.js` - magic-link email auth (Brevo), sessions, admin check.
+  - `lib/context.js` - "+ Add Context" attachments: .md/.txt read directly, PDFs
+    transcribed by claude-haiku-4-5 via Anthropic document support (a hand-rolled
+    PDF parser would silently produce garbage on CID fonts - wrong context is worse
+    than a rejected upload). 10 MB / 200k-char caps.
   - `console.js` - HTTP server: UI, SSE, transcription, history, admin injection.
   - `public/console.html` - the whole UI (vanilla, one file). `public/icons/` + manifest = PWA.
   - `board.js` - CLI (`--tier --providers --extended --base-roles --chairman --compare`).
@@ -97,6 +101,11 @@ user is admin.
 - **Fable/Opus refusals are member failures by design** - no server-side fallbacks; the
   board's identity guarantees matter more than rescue. Board sits short-handed, loudly.
 - **One run at a time** (409 on concurrent convene) - deliberate, it spends money.
+- **Attached context goes to EVERY stage** (opinions, peer reviews, chairman) by
+  design: reviewers who could not see the briefing would penalise answers that cite
+  it. That means context tokens are charged once per seat per stage - the console's
+  estimate accounts for this (~$0.30 extra per 40k chars on a mid 3-member board).
+  Context is stored in run.json and named in report.md.
 - **Runs survive drops two ways** (added 2026-08-05): (1) every run event is journaled
   in memory and replayed to any SSE subscriber that connects mid-run, so a phone that
   locks/reconnects rebuilds the live screen (EventSource auto-reconnects); (2)

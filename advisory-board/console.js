@@ -21,6 +21,7 @@ const path = require('node:path');
 const { loadKeys, TIERS, DEFAULT_TIER, DEFAULT_PROVIDERS, EXTENDED_SEAT_PROVIDERS } = require('./lib/config');
 const { convene, ROLES } = require('./lib/council');
 const { saveRun, RUNS_DIR } = require('./lib/store');
+const { extractContext, MAX_BYTES: MAX_CONTEXT_BYTES, MAX_CHARS: MAX_CONTEXT_CHARS } = require('./lib/context');
 const auth = require('./lib/auth');
 
 // 4821 locally (not the source project's 4820) so both consoles can run side
@@ -149,6 +150,7 @@ async function startRun(opts) {
   inflight = {
     startedAt: new Date().toISOString(),
     question: opts.question,
+    contextName: opts.context ? opts.context.name : null,
     tiers: tiersPlanned,
     providers: opts.providers,
     askedBy: opts.askedBy || null,
@@ -162,6 +164,7 @@ async function startRun(opts) {
     for (const tier of tiers) {
       const run = await convene({
         question: opts.question,
+        context: opts.context || null,
         tier,
         providers: opts.providers,
         extras: opts.extras || [],
@@ -542,6 +545,39 @@ ${ok
     return;
   }
 
+  // Context attachment: raw file bytes in, plain text out. The client keeps
+  // the text and sends it back with the run, so nothing is held server-side
+  // between the upload and the convene.
+  if (req.method === 'POST' && u.pathname === '/api/context') {
+    let keys;
+    try { keys = loadKeys(); } catch (err) { return json(res, 500, { error: err.message }); }
+    const filename = String(req.headers['x-filename'] || 'context');
+    const chunks = [];
+    let size = 0;
+    let aborted = false;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > MAX_CONTEXT_BYTES && !aborted) {
+        aborted = true;
+        json(res, 413, { error: 'That file is over the 10 MB limit.' });
+        req.destroy();
+        return;
+      }
+      if (!aborted) chunks.push(c);
+    });
+    req.on('end', async () => {
+      if (aborted) return;
+      if (!chunks.length) return json(res, 400, { error: 'No file received.' });
+      try {
+        const ctx = await extractContext(Buffer.concat(chunks), filename, keys);
+        json(res, 200, ctx);
+      } catch (err) {
+        json(res, 400, { error: err.message });
+      }
+    });
+    return;
+  }
+
   if (req.method === 'POST' && u.pathname === '/api/transcribe') {
     let keys;
     try { keys = loadKeys(); } catch (err) { return json(res, 500, { error: err.message }); }
@@ -606,9 +642,16 @@ ${ok
           if (!keys[p]) return json(res, 400, { error: `No API key configured for ${p}.` });
         }
       } catch (err) { return json(res, 500, { error: err.message }); }
+      // Attached context: the client sends back the extracted text it got
+      // from /api/context. Cap it here too - the endpoint is the trust boundary.
+      let context = null;
+      if (opts.context && opts.context.text) {
+        const text = String(opts.context.text).slice(0, MAX_CONTEXT_CHARS);
+        context = { name: String(opts.context.name || 'context').slice(0, 120), text, chars: text.length, kind: opts.context.kind || null };
+      }
       const askedBy =
         (MAGIC && auth.sessionEmail(req.headers.cookie)) || (HOSTED ? 'access-key' : 'local');
-      startRun({ question: String(opts.question), tier, providers: opts.providers.map(String), chairman: opts.chairman || null, compare, extras, baseRoles, askedBy });
+      startRun({ question: String(opts.question), context, tier, providers: opts.providers.map(String), chairman: opts.chairman || null, compare, extras, baseRoles, askedBy });
       json(res, 202, { ok: true });
     });
     return;

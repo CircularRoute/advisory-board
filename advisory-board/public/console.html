@@ -153,6 +153,14 @@
   .roleWrap .hint, .seatBlurb { font-size: 15px; color: var(--ink); }
   /* Prices in session/history rows stand out from the surrounding meta text. */
   .pr { color: var(--ink); font-weight: 700; }
+  .ctxlink { display: inline-block; margin-top: 8px; font: 600 15px var(--sans); color: var(--accent); background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  /* Name (elided if long) + remove on the first line; the meta note below, so
+     a long filename never squeezes itself to nothing on a phone. */
+  .ctxfile { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; margin-top: 10px; padding: 11px 14px; background: var(--tint); border-radius: 12px; font-size: 15px; }
+  .ctxfile .nm { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ctxfile .sz { grid-column: 1 / -1; color: var(--ink-soft); font-size: 13px; }
+  .ctxfile .rm { border: none; background: none; color: var(--ink-soft); font: 600 22px var(--sans); line-height: 1; cursor: pointer; padding: 0 2px; }
+  .ctxfile .rm:hover { color: var(--ink); }
   .s-patience { margin: 10px 0 14px; }
   .s-patience b { color: var(--ink); font-variant-numeric: tabular-nums; }
   .seatBlurb { margin: -3px 0 9px 4px; }
@@ -341,7 +349,9 @@
         <h2>The question</h2>
         <textarea id="q" aria-label="The question" placeholder="A hard, decision-shaped question. Give context: what the company is, the constraint, what a useful answer decides. Type it or press Dictate."></textarea>
         <button type="button" id="micBtn" class="micbtn" title="Dictate with the microphone - transcribed by OpenAI (about half a cent per minute)">&#127908; Dictate the question</button>
-        <div class="hint">Never convene the board on a question a single model would answer just as well.</div>
+        <input type="file" id="ctxFile" accept=".md,.markdown,.txt,.pdf,text/markdown,text/plain,application/pdf" hidden>
+        <button type="button" class="ctxlink" id="ctxBtn">+ Add Context</button>
+        <div id="ctxChip"></div>
         <div id="banners"></div>
         <button class="runbtn" id="runBtn">Convene the board</button>
       </div>
@@ -544,6 +554,7 @@
     compare: '',
     size: 3,
     extRoles: [null, null, null, null],
+    context: null,
     running: cfg.running,
   };
 
@@ -621,10 +632,13 @@
   }
   function estimateRun(tier) {
     const ros = fullRoster(tier), chair = resolveChair(tier, ros), n = ros.length;
+    // Attached context rides along on every call - opinions, reviews and the
+    // synthesis - so it is charged once per seat per stage, not once.
+    const ctxIn = state.context ? Math.ceil(state.context.chars / 4) : 0;
     let prepaid = 0, oop = 0;
     const add = (m, ti, to) => { const c = (ti / 1e6) * m.inPerM + (to / 1e6) * m.outPerM; if (m.provider === 'google') oop += c; else prepaid += c; };
-    for (const m of ros) { add(m, EST.opinionIn, EST.opinionOut); if (n >= 2) add(m, EST.opinionIn + (n - 1) * EST.opinionOut, EST.reviewOut); }
-    add(chair, EST.opinionIn + n * (EST.opinionOut + EST.reviewOut), EST.chairOut);
+    for (const m of ros) { add(m, EST.opinionIn + ctxIn, EST.opinionOut); if (n >= 2) add(m, EST.opinionIn + ctxIn + (n - 1) * EST.opinionOut, EST.reviewOut); }
+    add(chair, EST.opinionIn + ctxIn + n * (EST.opinionOut + EST.reviewOut), EST.chairOut);
     return { prepaid, oop };
   }
   const fmt = (n) => '$' + n.toFixed(2);
@@ -821,6 +835,45 @@
     $('reportDlg').showModal();
   }
   $('dlgClose').addEventListener('click', () => $('reportDlg').close());
+
+  // ---------- context attachment ----------
+  // The file is extracted to text server-side (Markdown read directly, PDFs
+  // transcribed); the page holds that text and sends it with the run, so every
+  // member, reviewer and the chairman reads the identical briefing.
+  function renderCtx() {
+    const c = state.context;
+    if (!c) { $('ctxChip').innerHTML = ''; $('ctxBtn').textContent = '+ Add Context'; return; }
+    $('ctxBtn').textContent = '+ Replace context';
+    $('ctxChip').innerHTML =
+      '<div class="ctxfile"><span class="nm">📎 ' + esc(c.name) + '</span>' +
+      '<button type="button" class="rm" id="ctxRm" title="Remove context" aria-label="Remove context">×</button>' +
+      '<span class="sz">' + (c.chars < 1000 ? c.chars + ' chars' : (c.chars / 1000).toFixed(1) + 'k chars') + ' · every member, reviewer and the chairman reads it</span></div>' +
+      (c.notes && c.notes.length ? '<div class="hint">' + esc(c.notes.join(' ')) + '</div>' : '');
+    $('ctxRm').addEventListener('click', () => { state.context = null; $('ctxFile').value = ''; renderCtx(); render(); });
+  }
+  $('ctxBtn').addEventListener('click', () => $('ctxFile').click());
+  $('ctxFile').addEventListener('change', async () => {
+    const f = $('ctxFile').files[0];
+    if (!f) return;
+    const busy = f.name.toLowerCase().endsWith('.pdf') ? 'Reading the PDF…' : 'Reading the file…';
+    $('ctxChip').innerHTML = '<div class="ctxfile"><span class="nm">' + esc(f.name) + '</span><span class="sz">' + busy + '</span></div>';
+    try {
+      const resp = await apiFetch('/api/context', {
+        method: 'POST',
+        headers: { 'content-type': 'application/octet-stream', 'x-filename': encodeURIComponent(f.name).replace(/%20/g, ' ') },
+        body: f,
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Could not read that file.');
+      state.context = { name: f.name, text: data.text, chars: data.chars, kind: data.kind, notes: data.notes || [] };
+    } catch (err) {
+      state.context = null;
+      $('banners').innerHTML += '<div class="banner err">' + esc(err.message) + '</div>';
+    }
+    $('ctxFile').value = '';
+    renderCtx();
+    render();
+  });
 
   // ---------- the role book: every role in one place ----------
   $('rolesBtn').addEventListener('click', () => {
@@ -1051,10 +1104,12 @@
     const extended = state.size === 3 ? [] : state.extRoles.slice(0, state.size - 3);
     const baseRoles = PROVIDERS.filter((p) => state.seats[p].on).map((p) => state.seats[p].role);
     const body = { question: q, tier: state.tier, providers, chairman, compare: state.compare ? state.compare.split(',') : [], extended, baseRoles };
+    if (state.context) body.context = { name: state.context.name, text: state.context.text, kind: state.context.kind };
     // Open the session screen BEFORE the request: the server starts
     // broadcasting (roster, stage 1) the moment it accepts the run, often
     // before the 202 arrives - opening afterwards would wipe those events.
     openSession(q);
+    if (state.context) feed('context attached: ' + state.context.name + ' (' + state.context.chars + ' chars) - every member reads it');
     state.running = true;
     render();
     let resp, e2;
@@ -1131,6 +1186,7 @@
   }
   if (qp.get('q')) $('q').value = qp.get('q');
 
+  renderCtx();
   render();
   refreshRuns();
 })();
