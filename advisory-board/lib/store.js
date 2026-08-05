@@ -40,8 +40,8 @@ function renderReport(run) {
     .join('\n');
   return `# Advisory Board - ${run.title}
 
-**Tier: ${run.tier.toUpperCase()}${run.mixedTier ? ' (mixed-tier board)' : ''}** | Board: ${run.members.map((m) => `${m.model}${m.memberTier && m.memberTier !== run.tier ? ` [${m.memberTier}]` : ''}`).join(' + ')} | Chairman: ${run.chairman.model} (${run.chairman.source}${run.chairman.isSittingMember ? '; SITTING MEMBER - known bias risk' : '; not a sitting member'})
-**Cost: ${fmtUsd(run.cost.totalUsd)}** (prepaid ${fmtUsd(run.cost.prepaidUsd)}, out-of-pocket ${fmtUsd(run.cost.outOfPocketUsd)})${run.failedMembers.length ? `\n**RAN SHORT-HANDED** - failed members: ${run.failedMembers.map((m) => m.model).join(', ')}` : ''}
+**Tier: ${run.tier.toUpperCase()}${run.mixedTier ? ' (mixed-tier board)' : ''}** | Board: ${run.members.map((m) => `${m.seatName || m.model}${m.memberTier && m.memberTier !== run.tier ? ` [${m.memberTier}]` : ''}`).join(' + ')} | Chairman: ${run.chairman.model} (${run.chairman.source}${run.chairman.isSittingMember ? '; SITTING MEMBER - known bias risk' : '; not a sitting member'})
+**Cost: ${fmtUsd(run.cost.totalUsd)}** (prepaid ${fmtUsd(run.cost.prepaidUsd)}, out-of-pocket ${fmtUsd(run.cost.outOfPocketUsd)})${run.failedMembers.length ? `\n**RAN SHORT-HANDED** - failed members: ${run.failedMembers.map((m) => m.seatName || m.model).join(', ')}` : ''}
 
 ## Question
 

@@ -110,7 +110,7 @@
   .runbtn:active:not([disabled]) { transform: scale(0.99); }
   .runbtn[disabled] { opacity: 0.35; cursor: not-allowed; }
 
-  .member-chip { display: flex; align-items: baseline; gap: 10px; font: 500 13px var(--mono); padding: 10px 13px; background: var(--tint); border-radius: 11px; margin-bottom: 7px; }
+  .member-chip { display: flex; align-items: baseline; gap: 8px 10px; flex-wrap: wrap; font: 500 13px var(--mono); padding: 10px 13px; background: var(--tint); border-radius: 11px; margin-bottom: 7px; }
   .member-chip .dot { width: 9px; height: 9px; border-radius: 50%; align-self: center; flex: none; }
   .member-chip .tiertag { margin-left: auto; font: 500 11px var(--sans); color: var(--ink-soft); text-align: right; }
   .member-chip .tiertag.offtier { color: var(--warn-ink); font-weight: 700; }
@@ -120,11 +120,22 @@
 
   .result { border-top: 3px solid var(--accent); }
   .result .meta { font: 500 12px/1.7 var(--mono); color: var(--ink-soft); margin-bottom: 10px; }
-  .answer { overflow-wrap: break-word; }
-  .answer h3 { font: 600 17px var(--sans); letter-spacing: -0.01em; margin: 20px 0 7px; }
-  .answer h4 { font: 600 15px var(--sans); margin: 15px 0 5px; }
-  .answer p, .answer li { font-size: 14.5px; line-height: 1.65; }
-  .answer hr { border: none; border-top: 1px solid var(--line); margin: 16px 0; }
+  .answer { overflow-wrap: break-word; font-size: 16px; }
+  .answer h3 { font: 600 19px var(--sans); letter-spacing: -0.01em; margin: 22px 0 8px; }
+  .answer h4 { font: 600 16.5px var(--sans); margin: 16px 0 6px; }
+  .answer p, .answer li { font-size: 16px; line-height: 1.7; }
+  .answer li { margin: 5px 0; }
+  .answer hr { border: none; border-top: 1px solid var(--line); margin: 18px 0; }
+  .answer code { background: var(--tint); border-radius: 5px; padding: 1px 6px; font-size: 14px; }
+  .ans-h { display: flex; gap: 11px; align-items: center; font: 600 17px var(--sans); margin: 26px 0 12px; padding: 12px 15px; border-radius: 12px; background: var(--tint); color: var(--ink); }
+  .ans-i { font-size: 19px; flex: none; }
+  .ans-h.final, .ans-h.agree { background: var(--ok-bg); color: var(--ok-ink); }
+  .ans-h.split { background: var(--warn-bg); color: var(--warn-ink); }
+  .ans-h.resolve { background: #EAF1FB; color: #33538C; }
+  .ans-h.warnh { background: var(--err-bg); color: var(--err-ink); }
+  .roleWrap { margin-top: 9px; }
+  .roleWrap .hint { margin-top: 4px; }
+  .seatBlurb { margin: -3px 0 9px 4px; }
 
   .runlist { list-style: none; margin: 0; padding: 0; }
   .runlist li { display: flex; gap: 10px; align-items: baseline; padding: 11px 10px; border-radius: 10px; font-size: 13.5px; cursor: pointer; transition: background .12s; }
@@ -165,6 +176,46 @@
     .switch .tr, .switch .th, .runbtn, .seg button, .micbtn.rec { transition: none !important; animation: none !important; }
   }
 
+
+  /* Extended-board role assignment rows */
+  .roleRow { display: flex; gap: 10px; align-items: center; margin: 9px 0 0; }
+  .roleRow .rl { font: 500 12px var(--mono); color: var(--ink-soft); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .roleRow select { flex: 1; font: 500 13px var(--sans); padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line); background: #fff; color: var(--ink); min-width: 0; }
+
+  /* Live session screen */
+  .s-q { font: 600 15px var(--sans); line-height: 1.5; margin-bottom: 14px; }
+  .stepper { display: flex; gap: 8px; margin: 0 0 18px; flex-wrap: wrap; }
+  .step { flex: 1; min-width: 150px; padding: 10px 12px; border-radius: 11px; background: var(--tint); color: var(--ink-soft); font: 600 13px var(--sans); display: flex; gap: 9px; align-items: center; }
+  .stepnum { width: 22px; height: 22px; border-radius: 50%; background: #C9C9CE; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; flex: none; }
+  .step.active { background: var(--ok-bg); color: var(--ok-ink); }
+  .step.active .stepnum, .step.done .stepnum { background: var(--accent); }
+  .step.done { color: var(--ink); }
+  .s-mem { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; padding: 11px 13px; background: var(--tint); border-radius: 11px; margin-bottom: 7px; font: 500 13px var(--mono); }
+  .s-mem .status { margin-left: auto; font: 500 12px var(--sans); color: var(--ink-soft); text-align: right; flex: none; max-width: 45%; }
+  .s-mem.working .status { color: var(--accent); }
+  .s-mem.failed .status { color: var(--err-ink); }
+  .pulse { animation: micpulse 1.4s infinite; }
+  .rolechip { font: 600 10px var(--sans); text-transform: uppercase; letter-spacing: 0.06em; background: #fff; border: 1px solid var(--line); padding: 2px 8px; border-radius: 999px; color: var(--ink-soft); flex: none; }
+  #sFeed { font: 400 12px/1.8 var(--mono); background: var(--tint); border-radius: 12px; padding: 12px 14px; max-height: 240px; overflow-y: auto; margin-top: 14px; white-space: pre-wrap; word-break: break-word; }
+  #sConsensus .banner { margin-top: 4px; }
+  #backBtn { max-width: 420px; margin-left: auto; margin-right: auto; display: block; }
+
+  /* Past sessions: collapsible tabs (question preview -> full conversation) */
+  .runlist li.sess { display: block; padding: 0; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 9px; cursor: default; }
+  .runlist li.sess:hover { background: #fff; }
+  .sess-head { display: flex; gap: 10px; align-items: baseline; padding: 12px 14px; cursor: pointer; border-radius: 12px; }
+  .sess-head:hover { background: var(--tint); }
+  .sess-q { flex: 1; min-width: 0; font: 600 13.5px/1.45 var(--sans); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .sess-meta { font: 500 11px var(--mono); color: var(--ink-soft); flex: none; text-align: right; }
+  .chev { flex: none; color: var(--ink-soft); transition: transform 0.15s; font-size: 12px; align-self: center; }
+  li.sess.open .chev { transform: rotate(180deg); }
+  .sess-body { padding: 2px 16px 16px; border-top: 1px solid var(--line); }
+
+  /* Share / Copy */
+  .sharebar { display: flex; gap: 10px; margin-top: 16px; }
+  .sbtn { flex: 1; padding: 12px; border-radius: 11px; border: 1px solid var(--line); background: #fff; color: var(--ink); font: 600 14px var(--sans); cursor: pointer; }
+  .sbtn:hover { background: var(--tint); }
+
   /* Phone layout: this console is used mostly from mobile. Form controls get
      16px fonts (anything smaller makes iOS Safari zoom the page on focus),
      seat rows wrap so the model select has a full line, and tap targets grow. */
@@ -195,7 +246,7 @@
   <h1 class="title">One hard question.<br>Three independent minds.</h1>
   <p class="lede">Frontier models from Anthropic, OpenAI and Google answer independently, blind-review each other, and a chairman distills one answer that names where they disagreed. You see the cost before you commit; the real cost is printed with the answer.</p>
 
-  <div class="grid">
+  <div class="grid" id="configGrid">
     <div>
       <div class="card">
         <h2>Configuration</h2>
@@ -208,6 +259,16 @@
           <span class="lab">Seats</span>
           <div id="seats"></div>
           <div class="hint">A seat may sit at a different tier than the board - e.g. a top board with a mid Gemini.</div>
+        </div>
+        <div class="field">
+          <span class="lab">Board size</span>
+          <div class="seg" id="sizeSeg">
+            <button data-size="3" aria-pressed="true">standard · 3</button>
+            <button data-size="5" aria-pressed="false">extended · 5</button>
+            <button data-size="7" aria-pressed="false">full bench · 7</button>
+          </div>
+          <div id="roleFields"></div>
+          <div class="hint" id="sizeHint"></div>
         </div>
         <div class="field">
           <label for="chair">Chairman</label>
@@ -223,32 +284,29 @@
           </div>
           <div class="hint">Calibrate runs the same question past two or three boards at different capability tiers and reports, side by side, whether the pricier board actually reached a different conclusion — or only cost more. Use it occasionally to learn which tier your kind of question needs. Cost multiplies by the number of tiers.</div>
         </div>
-        <div class="field">
-          <label for="q">The question</label>
-          <textarea id="q" placeholder="A hard, decision-shaped question. Give context: what the company is, the constraint, what a useful answer decides. Type it or press Dictate."></textarea>
-          <button type="button" id="micBtn" class="micbtn" title="Dictate with the microphone - transcribed by OpenAI (about half a cent per minute)">&#127908; Dictate the question</button>
-          <div class="hint">Never convene the board on a question a single model would answer just as well.</div>
-        </div>
       </div>
-
-      <div class="card">
-        <h2>Past runs</h2>
-        <ul class="runlist" id="runlist"><li>Loading...</li></ul>
-      </div>
-
-<!-- @X@ -->
     </div>
 
     <div>
       <div class="card">
         <h2>This board</h2>
         <div id="boardView"></div>
+      </div>
+
+      <div class="card">
+        <h2>Estimated cost</h2>
         <div id="estimate"></div>
+      </div>
+
+      <div class="card">
+        <h2>The question</h2>
+        <textarea id="q" aria-label="The question" placeholder="A hard, decision-shaped question. Give context: what the company is, the constraint, what a useful answer decides. Type it or press Dictate."></textarea>
+        <button type="button" id="micBtn" class="micbtn" title="Dictate with the microphone - transcribed by OpenAI (about half a cent per minute)">&#127908; Dictate the question</button>
+        <div class="hint">Never convene the board on a question a single model would answer just as well.</div>
         <div id="banners"></div>
         <button class="runbtn" id="runBtn">Convene the board</button>
-        <pre id="log" aria-live="polite"></pre>
       </div>
-      <div id="results"></div>
+
       <div class="card">
         <h2>Tier table ($ per 1M tokens)</h2>
         <div class="tablewrap"><table>
@@ -256,8 +314,32 @@
           <tbody id="priceRows"></tbody>
         </table></div>
       </div>
+
+      <div class="card">
+        <h2>Past sessions</h2>
+        <ul class="runlist" id="runlist"><li>Loading...</li></ul>
+      </div>
+<!-- @X@ -->
     </div>
   </div>
+
+  <div id="session" hidden>
+    <div class="card">
+      <h2>Board in session</h2>
+      <div class="s-q" id="sQuestion"></div>
+      <div class="stepper" id="stepper">
+        <div class="step" data-n="1"><span class="stepnum">1</span> Independent opinions</div>
+        <div class="step" data-n="2"><span class="stepnum">2</span> Blind peer review</div>
+        <div class="step" data-n="3"><span class="stepnum">3</span> Chairman synthesis</div>
+      </div>
+      <div id="sMembers"></div>
+      <div id="sConsensus"></div>
+      <div id="sFeed" aria-live="polite"></div>
+    </div>
+    <div id="sResults"></div>
+    <button class="runbtn" id="backBtn" hidden>Ask another question</button>
+  </div>
+
 </div>
 
 <div id="loginOverlay" hidden>
@@ -288,6 +370,7 @@
 (async function () {
   const $ = (id) => document.getElementById(id);
 
+  // ---------- auth ----------
   // Hosted mode auth: a session cookie set via magic link rides along
   // automatically; a stored access key (fallback) goes in a Bearer header.
   // Any 401 shows the sign-in overlay. Local mode: pass-through.
@@ -306,10 +389,10 @@
     return r;
   }
 
-  // Magic-link sign-in: request a link, then poll until it is tapped
-  // anywhere (mail app, Safari). The poll response sets THIS context's
-  // cookie - required for the installed PWA, whose cookie jar is separate
-  // from the browser the email link opens in.
+  // Magic-link sign-in: request a link, then poll until it is tapped anywhere
+  // (mail app, Safari). The poll response sets THIS context's cookie -
+  // required for the installed PWA, whose cookie jar is separate from the
+  // browser the email link opens in.
   let pollTimer = null;
   $('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -343,6 +426,11 @@
     location.reload();
   });
 
+  // Small stable surface for server-injected page fragments, announced with
+  // an event so fragments never depend on load-order timing.
+  window.__board = { apiFetch, esc, md, openReport };
+  window.dispatchEvent(new Event('board-ready'));
+
   let cfg;
   try {
     cfg = await (await apiFetch('/api/config')).json();
@@ -365,6 +453,8 @@
       });
     }
   }).catch(() => {});
+
+  // ---------- config ----------
   const TIERS = cfg.tiers;
   const TIER_NAMES = Object.keys(TIERS);
   const CHAIR_DEFAULT = { top: 'mid', mid: 'top', low: 'mid' };
@@ -372,6 +462,8 @@
   const PCOLOR = { anthropic: 'var(--anthropic)', openai: 'var(--openai)', google: 'var(--google)' };
   const PLABEL = { anthropic: 'Anthropic', openai: 'OpenAI', google: 'Gemini' };
   const EST = { opinionIn: 350, opinionOut: 2500, reviewOut: 2000, chairOut: 2800 };
+  const ROLE_LIST = cfg.roles || [];
+  const EXT_SEATS = cfg.extendedSeats || { 2: ['anthropic', 'openai'], 4: ['anthropic', 'openai', 'google', 'anthropic'] };
 
   // defaultProviders entries are "provider" or "provider:tier" (a seat pinned
   // off-tier, e.g. "google:mid" - the default Gemini seat).
@@ -383,12 +475,14 @@
   const state = {
     tier: cfg.defaultTier,
     seats: {
-      anthropic: { on: 'anthropic' in defaultSeat, pin: defaultSeat.anthropic || 'board' },
-      openai: { on: 'openai' in defaultSeat, pin: defaultSeat.openai || 'board' },
-      google: { on: 'google' in defaultSeat, pin: defaultSeat.google || 'board' },
+      anthropic: { on: 'anthropic' in defaultSeat, pin: defaultSeat.anthropic || 'board', role: null },
+      openai: { on: 'openai' in defaultSeat, pin: defaultSeat.openai || 'board', role: null },
+      google: { on: 'google' in defaultSeat, pin: defaultSeat.google || 'board', role: null },
     },
     chair: 'default',
     compare: '',
+    size: 3,
+    extRoles: ['contrarian', 'executor', 'outsider', 'expansionist'],
     running: cfg.running,
   };
 
@@ -412,11 +506,45 @@
     return out;
   }
 
+  // Decorated answer rendering: known section titles become icon-tagged,
+  // colour-coded headers so results read as a document, not plain text.
+  const ANS_SECTIONS = [
+    [/final answer/i, 'final', '\u{1F3AF}'],
+    [/where the board agreed/i, 'agree', '\u2705'],
+    [/where the board split/i, 'split', '\u2696\uFE0F'],
+    [/what would resolve/i, 'resolve', '\u{1F9ED}'],
+    [/^question$/i, 'plain', '\u2753'],
+    [/leaderboard/i, 'plain', '\u{1F3C6}'],
+    [/^cost$/i, 'plain', '\u{1F4B0}'],
+    [/warnings/i, 'warnh', '\u26A0\uFE0F'],
+  ];
+  function answerHtml(text) {
+    return md(text).replace(/<(h3|h4)>([^<]+)<\/\1>|<p><strong>([^<]+)<\/strong><\/p>/g, (m0, tag, hTitle, pTitle) => {
+      const title = (hTitle || pTitle || '').trim();
+      for (const [re, cls, icon] of ANS_SECTIONS) {
+        if (re.test(title)) return '<div class="ans-h ' + cls + '"><span class="ans-i">' + icon + '</span><span>' + title + '</span></div>';
+      }
+      return m0;
+    });
+  }
+
   function seatMember(p, tier) {
     const t = state.seats[p].pin === 'board' ? tier : state.seats[p].pin;
-    return { provider: p, memberTier: t, model: TIERS[t][p].model, inPerM: TIERS[t][p].inPerM, outPerM: TIERS[t][p].outPerM };
+    return { provider: p, memberTier: t, model: TIERS[t][p].model, inPerM: TIERS[t][p].inPerM, outPerM: TIERS[t][p].outPerM, role: state.seats[p].role };
   }
-  function roster(tier) { return PROVIDERS.filter((p) => state.seats[p].on).map((p) => seatMember(p, tier)); }
+  function baseRoster(tier) { return PROVIDERS.filter((p) => state.seats[p].on).map((p) => seatMember(p, tier)); }
+  function extraSeats(tier) {
+    if (state.size === 3) return [];
+    const provs = EXT_SEATS[state.size - 3] || [];
+    return provs.map((p, i) => ({
+      provider: p, memberTier: tier, model: TIERS[tier][p].model,
+      inPerM: TIERS[tier][p].inPerM, outPerM: TIERS[tier][p].outPerM,
+      role: state.extRoles[i],
+    }));
+  }
+  function fullRoster(tier) { return baseRoster(tier).concat(extraSeats(tier)); }
+  function roleName(key) { const r = ROLE_LIST.find((x) => x.key === key); return r ? r.name : key; }
+
   function resolveChair(tier, ros) {
     if (state.chair !== 'default') {
       const [prov, tr] = state.chair.split('|');
@@ -431,7 +559,7 @@
     return { provider: 'anthropic', model: slot.model, inPerM: slot.inPerM, outPerM: slot.outPerM, source, sitting: ros.some((m) => m.provider === 'anthropic' && m.model === slot.model) };
   }
   function estimateRun(tier) {
-    const ros = roster(tier), chair = resolveChair(tier, ros), n = ros.length;
+    const ros = fullRoster(tier), chair = resolveChair(tier, ros), n = ros.length;
     let prepaid = 0, oop = 0;
     const add = (m, ti, to) => { const c = (ti / 1e6) * m.inPerM + (to / 1e6) * m.outPerM; if (m.provider === 'google') oop += c; else prepaid += c; };
     for (const m of ros) { add(m, EST.opinionIn, EST.opinionOut); if (n >= 2) add(m, EST.opinionIn + (n - 1) * EST.opinionOut, EST.reviewOut); }
@@ -440,10 +568,19 @@
   }
   const fmt = (n) => '$' + n.toFixed(2);
 
+  const SIZE_HINTS = {
+    3: 'Three objective members - one per seated provider.',
+    5: 'Adds a Claude and a GPT seat at the board tier, each with an assigned perspective role. The first three members stay objective.',
+    7: 'Adds a second Claude, GPT and Gemini seat plus a third Claude, each with a role. The first three members stay objective.',
+  };
+
   function render() {
     $('tierSeg').innerHTML = TIER_NAMES.slice().reverse().map((t) => '<button data-tier="' + t + '" aria-pressed="' + (t === state.tier) + '">' + t + '</button>').join('');
     document.querySelectorAll('#cmpSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cmp === state.compare)));
+    document.querySelectorAll('#sizeSeg button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.size === state.size)));
+    $('sizeHint').textContent = SIZE_HINTS[state.size];
 
+    // seats
     const seatsEl = $('seats');
     seatsEl.innerHTML = '';
     for (const p of PROVIDERS) {
@@ -452,33 +589,62 @@
       row.className = 'seat' + (s.on ? '' : ' off');
       row.innerHTML =
         '<span class="dot" style="background:' + PCOLOR[p] + '"></span><span class="pname">' + PLABEL[p] + '</span>' +
-        '<select aria-label="' + PLABEL[p] + ' seat tier" data-p="' + p + '"' + (s.on ? '' : ' disabled') + '>' +
+        '<select class="tierSel" aria-label="' + PLABEL[p] + ' seat tier" data-p="' + p + '"' + (s.on ? '' : ' disabled') + '>' +
         '<option value="board"' + (s.pin === 'board' ? ' selected' : '') + '>board tier (' + TIERS[state.tier][p].model + ')</option>' +
         TIER_NAMES.map((t) => '<option value="' + t + '"' + (s.pin === t ? ' selected' : '') + '>' + t + ' (' + TIERS[t][p].model + ')</option>').join('') +
         '</select>' +
+        '<select class="roleSel" aria-label="' + PLABEL[p] + ' role" data-p="' + p + '"' + (s.on ? '' : ' disabled') + '>' +
+        '<option value=""' + (!s.role ? ' selected' : '') + '>Objective</option>' +
+        ROLE_LIST.map((r) => '<option value="' + r.key + '"' + (s.role === r.key ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('') +
+        '</select>' +
         '<label class="switch"><input type="checkbox" data-p="' + p + '"' + (s.on ? ' checked' : '') + ' aria-label="Seat ' + PLABEL[p] + '"><span class="tr"></span><span class="th"></span></label>';
       seatsEl.appendChild(row);
+      if (s.on && s.role) {
+        const rb = document.createElement('div');
+        rb.className = 'hint seatBlurb';
+        rb.textContent = (ROLE_LIST.find((r) => r.key === s.role) || {}).blurb || '';
+        seatsEl.appendChild(rb);
+      }
     }
-    seatsEl.querySelectorAll('select').forEach((el) => el.addEventListener('change', (e) => { state.seats[e.target.dataset.p].pin = e.target.value; render(); }));
+    seatsEl.querySelectorAll('select.tierSel').forEach((el) => el.addEventListener('change', (e) => { state.seats[e.target.dataset.p].pin = e.target.value; render(); }));
+    seatsEl.querySelectorAll('select.roleSel').forEach((el) => el.addEventListener('change', (e) => { state.seats[e.target.dataset.p].role = e.target.value || null; render(); }));
     seatsEl.querySelectorAll('input[type=checkbox]').forEach((el) => el.addEventListener('change', (e) => { state.seats[e.target.dataset.p].on = e.target.checked; render(); }));
+
+    // extended-board role assignments
+    const rf = $('roleFields');
+    if (state.size === 3) {
+      rf.innerHTML = '';
+    } else {
+      const provs = EXT_SEATS[state.size - 3] || [];
+      rf.innerHTML = provs.map((p, i) => {
+        const blurb = (ROLE_LIST.find((r) => r.key === state.extRoles[i]) || {}).blurb || '';
+        return '<div class="roleWrap"><div class="roleRow"><span class="rl"><span class="dot" style="background:' + PCOLOR[p] + ';display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px"></span>' + PLABEL[p] + ' · ' + esc(TIERS[state.tier][p].model) + '</span>' +
+        '<select data-idx="' + i + '" aria-label="Role for extra ' + PLABEL[p] + ' seat">' +
+        ROLE_LIST.map((r) => '<option value="' + r.key + '"' + (state.extRoles[i] === r.key ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('') +
+        '</select></div><div class="hint">' + esc(blurb) + '</div></div>';
+      }).join('');
+      rf.querySelectorAll('select').forEach((el) => el.addEventListener('change', (e) => { state.extRoles[+e.target.dataset.idx] = e.target.value; render(); }));
+    }
 
     const prevChair = state.chair;
     $('chair').innerHTML = '<option value="default">Default (non-sitting Anthropic, auto)</option>' +
       PROVIDERS.map((p) => TIER_NAMES.map((t) => '<option value="' + p + '|' + t + '">' + PLABEL[p] + ' ' + t + ' (' + TIERS[t][p].model + ')</option>').join('')).join('');
     $('chair').value = prevChair;
 
+    // this board + estimate + banners
     const view = $('boardView'), bannersEl = $('banners');
     view.innerHTML = ''; bannersEl.innerHTML = '';
-    const ros = roster(state.tier);
+    const base = baseRoster(state.tier);
     const runBtn = $('runBtn');
-    if (ros.length < 2) {
-      view.innerHTML = '<div class="member-chip">A board needs at least two seats.</div>';
-      $('estimate').innerHTML = ''; runBtn.disabled = true; return;
-    }
+    let blocked = null;
+    if (base.length < 2) blocked = 'A board needs at least two seated providers.';
+    if (state.size === 7 && !state.seats.google.on) blocked = 'The full bench includes a second Gemini seat - turn the Gemini seat on for a 7-member board.';
+    const ros = fullRoster(state.tier);
     for (const m of ros) {
       const off = m.memberTier !== state.tier;
       view.innerHTML += '<div class="member-chip"><span class="dot" style="background:' + PCOLOR[m.provider] + '"></span>' + m.model +
-        '<span class="tiertag' + (off ? ' offtier' : '') + '">' + m.memberTier + (off ? ' seat on a ' + state.tier + ' board' : '-tier') + '</span></div>';
+        (m.role ? ' <span class="rolechip">' + esc(roleName(m.role)) + '</span>' : '') +
+        '<span class="tiertag' + (off ? ' offtier' : '') + '">' + (m.role ? '' : 'objective · ') + m.memberTier + (off ? ' seat on a ' + state.tier + ' board' : '-tier') + '</span></div>';
     }
     const chair = resolveChair(state.tier, ros);
     view.innerHTML += '<div class="member-chip chair-chip"><span class="dot" style="background:' + PCOLOR[chair.provider] + '"></span>' + chair.model + '<span class="tiertag">chairman - ' + chair.source + '</span></div>';
@@ -487,19 +653,22 @@
     let prepaid = 0, oop = 0;
     for (const t of tiersToRun) { const e = estimateRun(t); prepaid += e.prepaid; oop += e.oop; }
     $('estimate').innerHTML =
-      '<div class="stat-row"><span class="k">Estimated' + (tiersToRun.length > 1 ? ' (' + tiersToRun.length + ' runs)' : '') + ', prepaid credit</span><span class="v">' + fmt(prepaid) + '</span></div>' +
+      '<div class="stat-row"><span class="k">Board</span><span class="v">' + ros.length + ' members' + (tiersToRun.length > 1 ? ' × ' + tiersToRun.length + ' tiers' : '') + '</span></div>' +
+      '<div class="stat-row"><span class="k">Prepaid credit (Anthropic + OpenAI)</span><span class="v">' + fmt(prepaid) + '</span></div>' +
       '<div class="stat-row"><span class="k">Out-of-pocket (Gemini)</span><span class="v' + (oop > 0 ? ' oop' : '') + '">' + fmt(oop) + '</span></div>' +
       '<div class="stat-row total"><span class="k">Total, roughly</span><span class="v">' + fmt(prepaid + oop) + '</span></div>' +
-      '<div class="hint">Rough estimate only; the real cost is printed after the run.</div>';
+      '<div class="hint">Rough estimate only; the real cost is printed with the answer.</div>';
 
-    if (state.seats.google.on) bannersEl.innerHTML += '<div class="banner warn">Gemini is seated: its share spends real money (Anthropic and OpenAI draw prepaid credit).</div>';
+    if (blocked) bannersEl.innerHTML += '<div class="banner err">' + esc(blocked) + '</div>';
+    if (!blocked && state.seats.google.on) bannersEl.innerHTML += '<div class="banner warn">Gemini is seated: its share spends real money (Anthropic and OpenAI draw prepaid credit).</div>';
     if (chair.sitting) bannersEl.innerHTML += '<div class="banner warn">This chairman sits on the board - a known bias risk. The record will flag it.</div>';
-    runBtn.disabled = state.running;
+    runBtn.disabled = state.running || !!blocked;
     runBtn.textContent = state.running ? 'Board in session...' : (tiersToRun.length > 1 ? 'Convene at ' + tiersToRun.length + ' tiers' : 'Convene the board');
   }
 
   $('tierSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { state.tier = b.dataset.tier; render(); } });
   $('cmpSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { state.compare = b.dataset.cmp; render(); } });
+  $('sizeSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { state.size = +b.dataset.size; render(); } });
   $('chair').addEventListener('change', (e) => { state.chair = e.target.value; render(); });
 
   // price table
@@ -508,33 +677,86 @@
     return '<tr><td><strong>' + t + '</strong></td><td class="mono">' + cell(r.openai) + '</td><td class="mono">' + cell(r.anthropic) + '</td><td class="mono">' + cell(r.google) + '</td></tr>';
   }).join('');
 
-  // past runs
+  // ---------- share / copy ----------
+  async function reportText(dir) {
+    return await (await apiFetch('/api/report?dir=' + encodeURIComponent(dir))).text();
+  }
+  function flash(btn, label) {
+    const old = btn.textContent;
+    btn.textContent = label;
+    setTimeout(() => { btn.textContent = old; }, 1600);
+  }
+  async function copyText(text, btn) {
+    try {
+      await navigator.clipboard.writeText(text);
+      flash(btn, 'Copied ✓');
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); flash(btn, 'Copied ✓'); } catch { flash(btn, 'Copy failed'); }
+      ta.remove();
+    }
+  }
+  function sharebar(dir) {
+    return '<div class="sharebar"><button class="sbtn" data-act="copy" data-dir="' + esc(dir) + '">Copy</button>' +
+      '<button class="sbtn" data-act="share" data-dir="' + esc(dir) + '">Share</button></div>';
+  }
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('.sbtn');
+    if (!b) return;
+    e.stopPropagation();
+    let text;
+    try { text = await reportText(b.dataset.dir); } catch { flash(b, 'Failed'); return; }
+    if (b.dataset.act === 'share' && navigator.share) {
+      try { await navigator.share({ title: 'Advisory Board', text }); } catch { /* user cancelled */ }
+    } else {
+      await copyText(text, b);
+      if (b.dataset.act === 'share') flash(b, 'Copied - paste anywhere');
+    }
+  });
+
+  // ---------- past sessions: collapsible tabs ----------
   async function refreshRuns() {
     const runs = await (await apiFetch('/api/runs')).json();
     const el = $('runlist');
-    if (!runs.length) { el.innerHTML = '<li>No runs yet.</li>'; return; }
-    el.innerHTML = runs.map((r) =>
-      '<li data-dir="' + esc(r.dir) + '"><span class="t">' + esc(r.title) + '</span>' +
-      '<span class="mono">' + esc(r.tier) + (r.mixedTier ? '*' : '') + '</span>' +
-      (r.shortHanded ? '<span class="mono flag">short-handed</span>' : '') +
-      '<span class="mono">' + (r.costUsd != null ? '$' + r.costUsd.toFixed(2) : '') + '</span></li>'
-    ).join('');
-    el.querySelectorAll('li[data-dir]').forEach((li) => li.addEventListener('click', () => openReport(li.dataset.dir)));
+    if (!runs.length) { el.innerHTML = '<li>No sessions yet.</li>'; return; }
+    el.innerHTML = runs.map((r) => {
+      const q = r.question || r.title || r.dir;
+      const date = (r.at || '').slice(0, 10);
+      return '<li class="sess" data-dir="' + esc(r.dir) + '">' +
+        '<div class="sess-head"><span class="sess-q">' + esc(q) + '</span>' +
+        '<span class="sess-meta">' + esc(r.tier) + (r.shortHanded ? ' · short-handed' : '') + (r.costUsd != null ? ' · $' + r.costUsd.toFixed(2) : '') + '<br>' + esc(date) + '</span>' +
+        '<span class="chev">▾</span></div>' +
+        '<div class="sess-body" hidden></div></li>';
+    }).join('');
+    el.querySelectorAll('.sess-head').forEach((head) => head.addEventListener('click', async () => {
+      const li = head.closest('li.sess');
+      const body = li.querySelector('.sess-body');
+      const opening = body.hidden;
+      if (opening && body.dataset.loaded !== '1') {
+        body.innerHTML = '<div class="hint">Loading…</div>';
+        body.hidden = false; li.classList.add('open');
+        try {
+          const text = await reportText(li.dataset.dir);
+          body.innerHTML = '<div class="answer">' + answerHtml(text) + '</div>' + sharebar(li.dataset.dir);
+          body.dataset.loaded = '1';
+        } catch {
+          body.innerHTML = '<div class="hint">Could not load this session.</div>';
+        }
+        return;
+      }
+      body.hidden = !opening;
+      li.classList.toggle('open', opening);
+    }));
   }
   async function openReport(dir) {
     const text = await (await apiFetch('/api/report?dir=' + encodeURIComponent(dir))).text();
-    $('reportBody').innerHTML = md(text);
+    $('reportBody').innerHTML = '<div class="answer">' + answerHtml(text) + '</div>' + sharebar(dir);
     $('reportDlg').showModal();
   }
-  // Small stable surface for server-injected page fragments, announced with
-  // an event so fragments never depend on load-order timing.
-  window.__board = { apiFetch, esc, md, openReport };
-  window.dispatchEvent(new Event('board-ready'));
   $('dlgClose').addEventListener('click', () => $('reportDlg').close());
 
-  // voice input: record with MediaRecorder, transcribe server-side via
-  // /api/transcribe (key-gated in hosted mode). Needs a secure context
-  // (https or localhost) for microphone access.
+  // ---------- voice input ----------
   const micBtn = $('micBtn');
   function micErr(msg) { $('banners').innerHTML += '<div class="banner err">' + esc(msg) + '</div>'; }
   if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder)) {
@@ -560,7 +782,7 @@
         micBtn.disabled = true; micBtn.classList.remove('rec'); micBtn.textContent = 'Transcribing…';
         try {
           const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
-          if (blob.size < 1500) throw new Error('Recording was too short - hold the button flow: tap, speak, tap stop.');
+          if (blob.size < 1500) throw new Error('Recording was too short - tap, speak, tap stop.');
           const r = await apiFetch('/api/transcribe', { method: 'POST', headers: { 'content-type': blob.type }, body: blob });
           const data = await r.json();
           if (!r.ok) throw new Error(data.error || 'transcription failed');
@@ -587,50 +809,193 @@
     });
   }
 
-  // run + live events
-  const logEl = $('log');
-  function logLine(s) { logEl.style.display = 'block'; logEl.textContent += s + '\n'; logEl.scrollTop = logEl.scrollHeight; }
+  // ---------- live session screen ----------
+  const S = { rows: new Map(), names: new Map() };
+  function openSession(question) {
+    $('configGrid').style.display = 'none';
+    $('session').hidden = false;
+    $('sQuestion').textContent = question;
+    $('sMembers').innerHTML = ''; $('sConsensus').innerHTML = ''; $('sFeed').textContent = ''; $('sResults').innerHTML = '';
+    $('backBtn').hidden = true;
+    S.rows.clear(); S.names.clear();
+    setStep(0);
+    window.scrollTo({ top: 0 });
+  }
+  function closeSession() {
+    $('session').hidden = true;
+    $('configGrid').style.display = '';
+    render(); refreshRuns();
+  }
+  $('backBtn').addEventListener('click', closeSession);
+  function feed(line) {
+    const el = $('sFeed');
+    el.textContent += line + '\n';
+    el.scrollTop = el.scrollHeight;
+  }
+  function setStep(n) {
+    document.querySelectorAll('#stepper .step').forEach((s) => {
+      const k = +s.dataset.n;
+      s.classList.toggle('active', k === n);
+      s.classList.toggle('done', k < n);
+    });
+  }
+  function setStatus(seat, text, opts = {}) {
+    const d = S.rows.get(seat);
+    if (!d) return;
+    const st = d.querySelector('.status');
+    st.textContent = text;
+    st.classList.toggle('pulse', !!opts.pulse);
+    d.classList.toggle('working', !!opts.pulse);
+    if (opts.failed) { d.classList.add('failed'); d.classList.remove('working'); }
+  }
+  function engineEvent(tier, e) {
+    const P = state.compare ? '[' + tier + '] ' : '';
+    if (e.t === 'roster') {
+      $('sMembers').innerHTML = ''; S.rows.clear(); S.names.clear(); $('sConsensus').innerHTML = '';
+      e.members.forEach((m) => {
+        S.names.set(m.seat, m.name);
+        const d = document.createElement('div');
+        d.className = 's-mem working';
+        d.innerHTML = '<span class="dot" style="background:' + PCOLOR[m.provider] + '"></span>' + esc(m.name) +
+          (m.role ? ' <span class="rolechip">' + esc(m.role) + '</span>' : '') +
+          '<span class="status pulse">thinking…</span>';
+        $('sMembers').appendChild(d);
+        S.rows.set(m.seat, d);
+      });
+      const c = document.createElement('div');
+      c.className = 's-mem chair-chip';
+      c.id = 'sChairRow';
+      c.innerHTML = '<span class="dot" style="background:' + PCOLOR[e.chairman.provider] + '"></span>' + esc(e.chairman.model) +
+        ' <span class="rolechip">chairman</span><span class="status">waiting for the board</span>';
+      $('sMembers').appendChild(c);
+      feed(P + 'Board seated: ' + e.members.map((m) => m.name + (m.role ? ' (' + m.role + ')' : '')).join(', '));
+      feed(P + 'Chairman: ' + e.chairman.model + ' (' + e.chairman.source + ')');
+    }
+    if (e.t === 'stage') {
+      setStep(e.n);
+      if (e.n === 1) feed(P + '— Stage 1: every member answers independently, nobody sees anyone else —');
+      if (e.n === 2) {
+        S.rows.forEach((d, seat) => { if (!d.classList.contains('failed')) setStatus(seat, 'reviewing peers…', { pulse: true }); });
+        feed(P + '— Stage 2: blind peer review - identities stripped, order shuffled per reviewer —');
+      }
+      if (e.n === 3) feed(P + '— Stage 3: the chairman reconciles and names the disagreements —');
+    }
+    if (e.t === 'opinion-done') {
+      setStatus(e.seat, 'answered · ' + e.outputTokens + ' tok · ' + Math.round(e.ms / 1000) + 's');
+      feed(P + (S.names.get(e.seat) || 'member') + ' delivered an answer (' + Math.round(e.ms / 1000) + 's)');
+    }
+    if (e.t === 'opinion-failed') {
+      setStatus(e.seat, 'failed', { failed: true });
+      feed(P + '⚠ ' + (S.names.get(e.seat) || 'member') + ' FAILED: ' + e.error);
+    }
+    if (e.t === 'review-done') {
+      setStatus(e.seat, e.ranking ? 'ranked: ' + e.ranking.join(' → ') : 'review in (ranking unparseable)');
+      feed(P + (S.names.get(e.seat) || 'member') + (e.ranking ? ' ranked the peers: ' + e.ranking.join(' → ') : ' returned a review, but the ranking was unparseable'));
+    }
+    if (e.t === 'review-failed') {
+      setStatus(e.seat, 'review failed', { failed: true });
+      feed(P + '⚠ ' + (S.names.get(e.seat) || 'member') + ' review FAILED: ' + e.error);
+    }
+    if (e.t === 'consensus') {
+      const lb = (e.leaderboard || []).filter((x) => x.avgPosition != null);
+      if (lb.length) {
+        $('sConsensus').innerHTML = '<div class="banner ok">🏆 Blind peer ranking: ' +
+          lb.map((x, i) => (i + 1) + '. ' + esc(x.member)).join(' &nbsp;·&nbsp; ') +
+          (String(e.confidence || '').startsWith('normal') ? '' : ' <em>(low confidence)</em>') + '</div>';
+        feed(P + 'Consensus check: the board blind-ranked ' + lb.map((x, i) => (i + 1) + '. ' + x.member).join(', '));
+      }
+    }
+    if (e.t === 'chairman-start') {
+      const c = $('sChairRow');
+      if (c) { c.classList.add('working'); const st = c.querySelector('.status'); st.textContent = (e.fallback ? 'fallback chair · ' : '') + 'synthesising…'; st.classList.add('pulse'); }
+      if (e.fallback) feed(P + '⚠ default chairman failed - fallback chairman ' + e.model + ' takes over');
+    }
+    if (e.t === 'chairman-done') {
+      const c = $('sChairRow');
+      if (c) { c.classList.remove('working'); const st = c.querySelector('.status'); st.textContent = 'synthesis complete · ' + Math.round(e.ms / 1000) + 's'; st.classList.remove('pulse'); }
+      feed(P + 'The chairman finished the synthesis (' + Math.round(e.ms / 1000) + 's)');
+    }
+    if (e.t === 'title') feed(P + 'Filed as: ' + e.title);
+  }
+  function renderResults(results) {
+    $('sResults').innerHTML = results.map((r) => {
+      const lb = r.leaderboard.entries.map((x, i) => (i + 1) + '. ' + esc(x.member) + (x.avgPosition != null ? ' (avg ' + x.avgPosition.toFixed(2) + ')' : '')).join(' &nbsp; ');
+      return '<div class="card result"><h2>' + esc(r.tier) + ' tier - ' + esc(r.title) + '</h2>' +
+        '<div class="meta">' + r.members.map((m) => esc(m.seatName || m.model)).join(' + ') + ' | chairman ' + esc(r.chairman.model) + (r.chairman.isSittingMember ? ' (SITTING)' : '') +
+        ' | ' + fmt(r.cost.totalUsd) + ' (oop ' + fmt(r.cost.outOfPocketUsd) + ')' +
+        (r.failedMembers.length ? ' | SHORT-HANDED: ' + r.failedMembers.map((m) => esc(m.seatName || m.model)).join(', ') : '') + '</div>' +
+        (r.warnings.length ? '<div class="banner warn">' + r.warnings.map(esc).join('<br>') + '</div>' : '') +
+        '<div class="answer">' + answerHtml(r.finalAnswer) + '</div>' +
+        '<div class="meta" style="margin-top:10px">Leaderboard: ' + lb + ' | ' + esc(r.leaderboard.confidence) + '</div>' +
+        sharebar(r.dir) + '</div>';
+    }).join('');
+  }
 
+  // ---------- convene ----------
   $('runBtn').addEventListener('click', async () => {
     const q = $('q').value.trim();
-    if (!q) { $('banners').innerHTML += '<div class="banner err">Write the question first.</div>'; return; }
+    if (!q) { $('banners').innerHTML = '<div class="banner err">Write (or dictate) the question first.</div>'; return; }
     const providers = PROVIDERS.filter((p) => state.seats[p].on).map((p) => state.seats[p].pin === 'board' ? p : p + ':' + state.seats[p].pin);
     let chairman = null;
     if (state.chair !== 'default') { const [prov, tr] = state.chair.split('|'); chairman = prov + ':' + TIERS[tr][prov].model; }
-    const body = { question: q, tier: state.tier, providers, chairman, compare: state.compare ? state.compare.split(',') : [] };
-    logEl.textContent = ''; $('results').innerHTML = '';
-    const resp = await apiFetch('/api/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-    if (!resp.ok) { const e = await resp.json(); $('banners').innerHTML += '<div class="banner err">' + esc(e.error) + '</div>'; return; }
-    state.running = true; render();
+    const extended = state.size === 3 ? [] : state.extRoles.slice(0, state.size - 3);
+    const baseRoles = PROVIDERS.filter((p) => state.seats[p].on).map((p) => state.seats[p].role);
+    const body = { question: q, tier: state.tier, providers, chairman, compare: state.compare ? state.compare.split(',') : [], extended, baseRoles };
+    // Open the session screen BEFORE the request: the server starts
+    // broadcasting (roster, stage 1) the moment it accepts the run, often
+    // before the 202 arrives - opening afterwards would wipe those events.
+    openSession(q);
+    state.running = true;
+    render();
+    let resp, e2;
+    try {
+      resp = await apiFetch('/api/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      if (!resp.ok) e2 = (await resp.json()).error;
+    } catch (err) {
+      e2 = err.message;
+    }
+    if (e2) {
+      state.running = false;
+      closeSession();
+      $('banners').innerHTML += '<div class="banner err">' + esc(e2) + '</div>';
+    }
   });
 
-  // EventSource cannot set headers, so hosted mode passes the key as ?key=.
+  // ---------- live events ----------
   const es = new EventSource('/api/events' + (KEY ? '?key=' + encodeURIComponent(KEY) : ''));
   es.onmessage = (ev) => {
     const e = JSON.parse(ev.data);
-    if (e.type === 'hello') { state.running = e.running; render(); return; }
-    if (e.type === 'started') { logLine('board convened (' + (e.opts.compare && e.opts.compare.length ? 'compare: ' + e.opts.compare.join(', ') : 'tier: ' + e.opts.tier) + ')'); }
-    if (e.type === 'log') logLine('[' + e.tier + '] ' + e.line);
-    if (e.type === 'run-done') logLine('[' + e.tier + '] run recorded: ' + e.dir);
-    if (e.type === 'error') { logLine('ERROR: ' + e.message); state.running = false; render(); }
+    if (e.type === 'hello') {
+      state.running = e.running;
+      if (e.running && $('session').hidden) {
+        openSession('(a board is already in session - attaching to the live feed)');
+        feed('rejoined mid-session; showing events from now on');
+      }
+      render();
+      return;
+    }
+    if (e.type === 'engine') { engineEvent(e.tier, e.e); return; }
+    if (e.type === 'started') { if ($('session').hidden) openSession('(board convened elsewhere - live feed)'); feed('board convened (' + (e.opts.compare && e.opts.compare.length ? 'Calibrate: ' + e.opts.compare.join(', ') : 'tier: ' + e.opts.tier) + ')'); }
+    if (e.type === 'log') feed('· ' + e.line);
+    if (e.type === 'run-done') feed('record saved: ' + e.dir);
+    if (e.type === 'error') {
+      feed('⚠ ERROR: ' + e.message);
+      $('sResults').innerHTML = '<div class="banner err">' + esc(e.message) + '</div>';
+      $('backBtn').hidden = false;
+      state.running = false; render();
+    }
     if (e.type === 'done') {
-      state.running = false; render(); refreshRuns();
-      $('results').innerHTML = e.results.map((r) => {
-        const lb = r.leaderboard.entries.map((x, i) => (i + 1) + '. ' + x.member + (x.avgPosition != null ? ' (avg ' + x.avgPosition.toFixed(2) + ')' : '')).join(' &nbsp; ');
-        return '<div class="card result"><h2>' + esc(r.tier) + ' tier - ' + esc(r.title) + '</h2>' +
-          '<div class="meta">' + r.members.map((m) => esc(m.model)).join(' + ') + ' | chairman ' + esc(r.chairman.model) + (r.chairman.isSittingMember ? ' (SITTING)' : '') +
-          ' | ' + fmt(r.cost.totalUsd) + ' (oop ' + fmt(r.cost.outOfPocketUsd) + ')' +
-          (r.failedMembers.length ? ' | SHORT-HANDED: ' + r.failedMembers.map((m) => esc(m.model)).join(', ') : '') + '</div>' +
-          (r.warnings.length ? '<div class="banner warn">' + r.warnings.map(esc).join('<br>') + '</div>' : '') +
-          '<div class="answer">' + md(r.finalAnswer) + '</div>' +
-          '<div class="meta" style="margin-top:10px">Leaderboard: ' + lb + ' | ' + esc(r.leaderboard.confidence) + '</div></div>';
-      }).join('');
+      setStep(4);
+      renderResults(e.results);
+      $('backBtn').hidden = false;
+      state.running = false;
+      render(); refreshRuns();
     }
   };
 
   // URL prefill, so an agent can hand a configured board to the human whose
   // tap on Convene is the spend approval:
-  //   /?q=...&tier=top&providers=anthropic,openai,google:mid&chairman=anthropic|top&compare=mid,top
+  //   /?q=...&tier=top&providers=anthropic,openai,google:mid&chairman=anthropic|top&compare=mid,top&size=5&roles=contrarian,executor
   const qp = new URLSearchParams(location.search);
   if (qp.get('tier') && TIERS[qp.get('tier')]) state.tier = qp.get('tier');
   if (qp.get('providers')) {
@@ -645,6 +1010,10 @@
     if (PROVIDERS.includes(cp) && TIERS[ct]) state.chair = qp.get('chairman');
   }
   if (qp.get('compare') && ['mid,top', 'low,mid,top'].includes(qp.get('compare'))) state.compare = qp.get('compare');
+  if (qp.get('size') && [5, 7].includes(+qp.get('size'))) state.size = +qp.get('size');
+  if (qp.get('roles')) {
+    qp.get('roles').split(',').forEach((r, i) => { if (ROLE_LIST.some((x) => x.key === r) && i < 4) state.extRoles[i] = r; });
+  }
   if (qp.get('q')) $('q').value = qp.get('q');
 
   render();

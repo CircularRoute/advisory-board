@@ -93,6 +93,15 @@ const PREPAID_PROVIDERS = new Set(['anthropic', 'openai']);
 const DEFAULT_PROVIDERS = ['anthropic', 'openai', 'google:mid'];
 const DEFAULT_TIER = 'mid';
 
+// Extended-board seat pattern (owner decision 2026-08-05): +2 roles seats one
+// extra Claude and one extra GPT; +4 roles seats a second Claude, GPT and
+// Gemini plus a third Claude. Extras always sit at the board's tier and each
+// carries a perspective role; the first three members stay objective.
+const EXTENDED_SEAT_PROVIDERS = {
+  2: ['anthropic', 'openai'],
+  4: ['anthropic', 'openai', 'google', 'anthropic'],
+};
+
 // Chairman default: an Anthropic model from a DIFFERENT tier than the board, so
 // the Chairman is never a sitting member (matters most on a 2-member board).
 // Same-provider as one member is imperfect but materially better than
@@ -153,6 +162,7 @@ module.exports = {
   PREPAID_PROVIDERS,
   DEFAULT_PROVIDERS,
   DEFAULT_TIER,
+  EXTENDED_SEAT_PROVIDERS,
   resolveChairman,
   resolveFallbackChairman,
 };

@@ -18,8 +18,8 @@ const crypto = require('node:crypto');
 const { readFileSync, readdirSync, existsSync } = require('node:fs');
 const path = require('node:path');
 
-const { loadKeys, TIERS, DEFAULT_TIER, DEFAULT_PROVIDERS } = require('./lib/config');
-const { convene } = require('./lib/council');
+const { loadKeys, TIERS, DEFAULT_TIER, DEFAULT_PROVIDERS, EXTENDED_SEAT_PROVIDERS } = require('./lib/config');
+const { convene, ROLES } = require('./lib/council');
 const { saveRun, RUNS_DIR } = require('./lib/store');
 const auth = require('./lib/auth');
 
@@ -76,9 +76,12 @@ async function startRun(opts) {
         question: opts.question,
         tier,
         providers: opts.providers,
+        extras: opts.extras || [],
+        baseRoles: opts.baseRoles || [],
         chairmanOverride: opts.chairman || null,
         keys: loadKeys(),
         log: (m) => broadcast({ type: 'log', tier, line: m }),
+        onEvent: (e) => broadcast({ type: 'engine', tier, e }),
       });
       run.askedBy = opts.askedBy || null; // who convened this board (admin history)
       const dir = saveRun(run);
@@ -189,10 +192,11 @@ function listRuns(limit = 25) {
       out.push({
         dir,
         title: r.title,
+        question: r.question || null,
         tier: r.tier,
         mixedTier: !!r.mixedTier,
         at: r.finishedAt,
-        members: (r.members || []).map((m) => m.model),
+        members: (r.members || []).map((m) => m.seatName || m.model),
         costUsd: r.cost ? r.cost.totalUsd : null,
         shortHanded: (r.failedMembers || []).length > 0,
       });
@@ -392,6 +396,8 @@ ${ok
       tiers: TIERS,
       defaultTier: DEFAULT_TIER,
       defaultProviders: DEFAULT_PROVIDERS,
+      roles: Object.entries(ROLES).map(([key, r]) => ({ key, name: r.name, blurb: r.blurb })),
+      extendedSeats: EXTENDED_SEAT_PROVIDERS,
       running,
     });
   }
@@ -468,17 +474,32 @@ ${ok
       if (!Array.isArray(opts.providers) || opts.providers.length < 2) return json(res, 400, { error: 'Seat at least two providers.' });
       const tier = opts.tier && TIERS[opts.tier] ? opts.tier : DEFAULT_TIER;
       const compare = Array.isArray(opts.compare) ? opts.compare.filter((t) => TIERS[t]) : [];
+      // Extended board: 2 roles -> +Claude +GPT (5 members); 4 roles ->
+      // +Claude +GPT +Gemini +Claude (7 members).
+      const extendedRoles = Array.isArray(opts.extended) ? opts.extended.map(String) : [];
+      let extras = [];
+      if (extendedRoles.length) {
+        const pattern = EXTENDED_SEAT_PROVIDERS[extendedRoles.length];
+        if (!pattern) return json(res, 400, { error: 'The extended board takes exactly 2 or 4 role assignments.' });
+        for (const r of extendedRoles) if (!ROLES[r]) return json(res, 400, { error: `Unknown role: ${r}` });
+        extras = extendedRoles.map((role, i) => ({ provider: pattern[i], role }));
+      }
+      // Optional roles for the base (first three) members, aligned by index.
+      const baseRoles = Array.isArray(opts.baseRoles)
+        ? opts.baseRoles.slice(0, opts.providers.length).map((r) => (r ? String(r) : null))
+        : [];
+      for (const r of baseRoles) if (r && !ROLES[r]) return json(res, 400, { error: `Unknown role: ${r}` });
       // keys are validated up front so a missing key fails the request, not the run
       try {
         const keys = loadKeys();
-        for (const spec of opts.providers) {
+        for (const spec of [...opts.providers, ...extras.map((e) => e.provider)]) {
           const p = String(spec).split(':')[0];
           if (!keys[p]) return json(res, 400, { error: `No API key configured for ${p}.` });
         }
       } catch (err) { return json(res, 500, { error: err.message }); }
       const askedBy =
         (MAGIC && auth.sessionEmail(req.headers.cookie)) || (HOSTED ? 'access-key' : 'local');
-      startRun({ question: String(opts.question), tier, providers: opts.providers.map(String), chairman: opts.chairman || null, compare, askedBy });
+      startRun({ question: String(opts.question), tier, providers: opts.providers.map(String), chairman: opts.chairman || null, compare, extras, baseRoles, askedBy });
       json(res, 202, { ok: true });
     });
     return;

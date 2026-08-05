@@ -64,6 +64,34 @@ The console ships a web-app manifest and icons: open the site in the phone brows
 
 All IDs verified against each provider's live models endpoint on 2026-08-05. Gemini pro-class only exists as a preview ID. **The default board seats all three vendors, with the Gemini seat pinned to mid tier** (`--providers=anthropic,openai,google:mid`). Anthropic and OpenAI draw prepaid credit; the Google seat spends real money - every run's output flags that out-of-pocket share, and the seat is one toggle (or `--providers=anthropic,openai`) to drop. A three-member board also makes the blind-ranking leaderboard meaningful (with two members it is degenerate).
 
+## Extended boards and roles
+
+The first three members are objective by default. **Extended · 5** adds a Claude and
+a GPT seat at the board tier; **full bench · 7** adds a second Claude, GPT and Gemini
+seat plus a third Claude. Every extra seat carries a perspective role, chosen per
+seat (base members can optionally take a role too, via the seat's role selector or
+`--base-roles=`):
+
+- **Contrarian** - actively searches for flaws, risks, and everything that could fail.
+- **Expansionist** - hunts for massive upside, hidden scaling opportunities, missed angles.
+- **Outsider** - zero emotional attachment or industry bias; first principles.
+- **Executor** - bypasses theory for immediate, high-ROI, practical next steps.
+- **Behavioral Psychologist** - how real humans will actually react, not idealized ones.
+- **Trade-off Analyst** - every choice has a cost; charts what you sacrifice for each upside.
+- **Neutral Arbiter** - judges arguments strictly on logic and clarity, filtering hype.
+
+The chairman is told which roles sat on the board (never which label held which
+role). CLI: `--extended=contrarian,executor` (5 members) or four roles (7 members).
+
+## The live session
+
+Convening opens a live view instead of a frozen form: a three-step tracker
+(opinions -> blind review -> synthesis), per-member cards that show thinking /
+answered / reviewing / rankings in real time, a consensus banner with the blind
+peer ranking, and a play-by-play feed. Results render as a styled document with
+Share and Copy buttons, and every past session sits in a collapsible tab (first
+lines of the question) that expands to the full conversation - also sharable.
+
 ## The mechanism
 
 1. **Independent opinions** - the question fans out to all members in parallel; no member sees another's answer.

@@ -10,8 +10,8 @@
 // Advisory only: prints an answer and persists the record. Never writes to any
 // other system, never sends, never decides.
 
-const { loadKeys, DEFAULT_TIER, DEFAULT_PROVIDERS, HOUSEKEEPING, TIERS } = require('./lib/config');
-const { convene } = require('./lib/council');
+const { loadKeys, DEFAULT_TIER, DEFAULT_PROVIDERS, HOUSEKEEPING, TIERS, EXTENDED_SEAT_PROVIDERS } = require('./lib/config');
+const { convene, ROLES } = require('./lib/council');
 const { callModel } = require('./lib/providers');
 const { saveRun, saveComparison, fmtUsd } = require('./lib/store');
 
@@ -22,6 +22,8 @@ function parseArgs(argv) {
     if (a.startsWith('--tier=')) opts.tier = a.slice(7);
     else if (a.startsWith('--providers=')) opts.providers = a.slice(12).split(',').map((s) => s.trim()).filter(Boolean);
     else if (a.startsWith('--chairman=')) opts.chairman = a.slice(11);
+    else if (a.startsWith('--extended=')) opts.extended = a.slice(11).split(',').map((s) => s.trim()).filter(Boolean);
+    else if (a.startsWith('--base-roles=')) opts.baseRoles = a.slice(13).split(',').map((s) => s.trim() || null);
     else if (a.startsWith('--compare=')) opts.compare = a.slice(10).split(',').map((s) => s.trim()).filter(Boolean);
     else if (a === '--help' || a === '-h') opts.help = true;
     else rest.push(a);
@@ -67,6 +69,8 @@ async function compareAcrossTiers(opts, keys) {
       question: opts.question,
       tier,
       providers: opts.providers,
+      extras: opts.extras,
+      baseRoles: opts.baseRoles || [],
       chairmanOverride: opts.chairman,
       keys,
       log: (m) => console.log(`[${tier}] ${m}`),
@@ -134,12 +138,32 @@ is pinned to mid tier and spends out-of-pocket money; drop it with
 A provider entry may pin its member to another tier or an exact model
 (mixed-tier board), e.g. a top board with a cheaper Gemini seat:
   --tier=top --providers=anthropic,openai,google:mid
-  --tier=top --providers=anthropic,openai,google:gemini-3.5-flash-lite`);
+  --tier=top --providers=anthropic,openai,google:gemini-3.5-flash-lite
+
+Extended board (--extended): role-assigned extra seats at the board tier;
+the first three members stay objective. 2 roles seat +Claude +GPT (5-member
+board); 4 roles seat +Claude +GPT +Gemini +Claude (7-member board).
+Roles: contrarian, expansionist, outsider, executor, psychologist,
+tradeoff, arbiter.
+  --extended=contrarian,executor
+  --extended=contrarian,expansionist,outsider,executor
+
+The base members are objective by default; optionally assign them roles too
+(aligned with --providers, empty slot = objective):
+  --base-roles=arbiter,,psychologist`);
     process.exit(opts.help ? 0 : 1);
   }
+  // Extended board: 2 roles -> +Claude +GPT; 4 roles -> +Claude +GPT +Gemini +Claude.
+  opts.extras = [];
+  if (opts.extended && opts.extended.length) {
+    const pattern = EXTENDED_SEAT_PROVIDERS[opts.extended.length];
+    if (!pattern) throw new Error('--extended takes exactly 2 roles (5-member board) or 4 roles (7-member board)');
+    for (const r of opts.extended) if (!ROLES[r]) throw new Error(`Unknown role "${r}" (valid: ${Object.keys(ROLES).join(', ')})`);
+    opts.extras = opts.extended.map((role, i) => ({ provider: pattern[i], role }));
+  }
   const keys = loadKeys();
-  for (const spec of opts.providers) {
-    const p = spec.split(':')[0];
+  for (const spec of [...opts.providers, ...opts.extras.map((e) => e.provider)]) {
+    const p = String(spec).split(':')[0];
     if (!keys[p]) throw new Error(`Provider "${p}" requested but no key found in the key env file.`);
   }
   if (opts.chairman) {
@@ -156,6 +180,8 @@ A provider entry may pin its member to another tier or an exact model
     question: opts.question,
     tier: opts.tier,
     providers: opts.providers,
+    extras: opts.extras,
+    baseRoles: opts.baseRoles || [],
     chairmanOverride: opts.chairman,
     keys,
     log: (m) => console.log(m),
