@@ -72,6 +72,13 @@
     background: var(--accent); color: var(--accent-ink); border: none; border-radius: 8px; cursor: pointer; transition: opacity 0.15s;
   }
   .runbtn[disabled] { opacity: 0.5; cursor: not-allowed; }
+  .qhead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .qhead label { display: block; font-weight: 600; font-size: 13.5px; margin-bottom: 6px; }
+  .micbtn { font-family: var(--mono); font-size: 12px; padding: 4px 12px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); border-radius: 6px; cursor: pointer; flex: none; }
+  .micbtn.rec { background: var(--err-soft); color: var(--err); border-color: var(--err); animation: micpulse 1.2s infinite; }
+  .micbtn[disabled] { opacity: 0.6; cursor: wait; }
+  @keyframes micpulse { 50% { opacity: 0.55; } }
+  @media (prefers-reduced-motion: reduce) { .micbtn.rec { animation: none; } }
   .member-chip { display: flex; align-items: baseline; gap: 9px; font-family: var(--mono); font-size: 12.5px; padding: 7px 11px; background: var(--panel-2); border-radius: 7px; margin-bottom: 6px; }
   .member-chip .dot { width: 8px; height: 8px; border-radius: 50%; align-self: center; flex: none; }
   .member-chip .tiertag { margin-left: auto; font-size: 11px; color: var(--ink-soft); text-align: right; }
@@ -137,8 +144,11 @@
           </div>
         </div>
         <div class="field">
-          <label for="q">The question</label>
-          <textarea id="q" placeholder="A hard, decision-shaped question. Give context: what the company is, the constraint, what a useful answer decides."></textarea>
+          <div class="qhead">
+            <label for="q">The question</label>
+            <button type="button" id="micBtn" class="micbtn" title="Dictate with the microphone - transcribed by OpenAI (about half a cent per minute)">&#127908; Dictate</button>
+          </div>
+          <textarea id="q" placeholder="A hard, decision-shaped question. Give context: what the company is, the constraint, what a useful answer decides. Type it or press Dictate."></textarea>
           <div class="hint">Never convene the board on a question a single model would answer just as well.</div>
         </div>
       </div>
@@ -349,6 +359,61 @@
     }));
   }
   $('dlgClose').addEventListener('click', () => $('reportDlg').close());
+
+  // voice input: record with MediaRecorder, transcribe server-side via
+  // /api/transcribe (key-gated in hosted mode). Needs a secure context
+  // (https or localhost) for microphone access.
+  const micBtn = $('micBtn');
+  function micErr(msg) { $('banners').innerHTML += '<div class="banner err">' + esc(msg) + '</div>'; }
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder)) {
+    micBtn.style.display = 'none';
+  } else {
+    let rec = null, chunks = [], stream = null, tick = null, startedAt = 0;
+    const MAX_MS = 120000; // 2 min cap, matches the server's size cap
+    micBtn.addEventListener('click', async () => {
+      if (rec && rec.state === 'recording') { rec.stop(); return; }
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        micErr('Microphone access was denied. Allow it in the browser (voice input needs https or localhost).');
+        return;
+      }
+      const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'].find((t) => MediaRecorder.isTypeSupported(t));
+      rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      chunks = [];
+      rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        clearInterval(tick);
+        micBtn.disabled = true; micBtn.classList.remove('rec'); micBtn.textContent = 'Transcribing…';
+        try {
+          const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+          if (blob.size < 1500) throw new Error('Recording was too short - hold the button flow: tap, speak, tap stop.');
+          const r = await apiFetch('/api/transcribe', { method: 'POST', headers: { 'content-type': blob.type }, body: blob });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.error || 'transcription failed');
+          const q = $('q');
+          q.value = (q.value.trim() ? q.value.trim() + ' ' : '') + data.text.trim();
+          q.focus();
+        } catch (err) {
+          micErr(err.message);
+        }
+        micBtn.disabled = false; micBtn.innerHTML = '&#127908; Dictate';
+      };
+      rec.start();
+      startedAt = Date.now();
+      micBtn.classList.add('rec');
+      const label = () => {
+        const s = Math.floor((Date.now() - startedAt) / 1000);
+        micBtn.textContent = '⏹ Stop ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+      };
+      label();
+      tick = setInterval(() => {
+        label();
+        if (Date.now() - startedAt >= MAX_MS && rec.state === 'recording') rec.stop();
+      }, 1000);
+    });
+  }
 
   // run + live events
   const logEl = $('log');

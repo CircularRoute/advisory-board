@@ -29,6 +29,8 @@ node console.js        ->  http://127.0.0.1:4821
 
 A web console over the same engine: pick tier and seats (including mixed-tier pinning per seat), see the cost estimate split prepaid vs out-of-pocket BEFORE convening, press Run, watch the stages stream live, read the chairman's answer and every past run's report. One board at a time.
 
+The question can be typed or dictated: the **Dictate** button records with the browser microphone and transcribes server-side through OpenAI's audio API (`/api/transcribe`, key-gated like every spending endpoint; ~half a cent per minute, 2-minute cap). Microphone access needs a secure context - https (Render) or localhost.
+
 Two modes, decided by `BOARD_ACCESS_KEY`:
 
 - **Local (no key, the default):** binds to 127.0.0.1 only, no auth - runs spend API credit, so the loopback bind is the gate. Port 4821, so it can run alongside the source project's console on 4820. In Claude desktop it opens via the `advisory-board-console` entry in `.claude/launch.json`.

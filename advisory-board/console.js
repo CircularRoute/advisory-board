@@ -85,6 +85,67 @@ async function startRun(opts) {
   }
 }
 
+// ---- voice transcription (OpenAI audio API, raw multipart over https) ----
+const https = require('node:https');
+
+function transcribeAudio(audio, contentType, apiKey) {
+  const ct = (contentType || 'audio/webm').split(';')[0].trim();
+  const ext =
+    { 'audio/webm': 'webm', 'audio/mp4': 'mp4', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3',
+      'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/x-m4a': 'm4a', 'audio/aac': 'aac' }[ct] || 'webm';
+  const tryModel = (model) =>
+    new Promise((resolve, reject) => {
+      const boundary = '----board' + crypto.randomBytes(10).toString('hex');
+      const body = Buffer.concat([
+        Buffer.from(
+          `--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\n${model}\r\n` +
+            `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="audio.${ext}"\r\nContent-Type: ${ct}\r\n\r\n`
+        ),
+        audio,
+        Buffer.from(`\r\n--${boundary}--\r\n`),
+      ]);
+      const rq = https.request(
+        {
+          hostname: 'api.openai.com',
+          path: '/v1/audio/transcriptions',
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${apiKey}`,
+            'content-type': `multipart/form-data; boundary=${boundary}`,
+            'content-length': body.length,
+          },
+        },
+        (rs) => {
+          let d = '';
+          rs.setEncoding('utf8');
+          rs.on('data', (c) => (d += c));
+          rs.on('end', () => {
+            if (rs.statusCode < 200 || rs.statusCode >= 300) {
+              return reject(new Error(`HTTP ${rs.statusCode}: ${d.slice(0, 200)}`));
+            }
+            try {
+              const parsed = JSON.parse(d);
+              if (!parsed.text || !parsed.text.trim()) return reject(new Error('empty transcript'));
+              resolve(parsed.text.trim());
+            } catch {
+              reject(new Error('bad JSON from transcription API'));
+            }
+          });
+        }
+      );
+      rq.setTimeout(120000, () => rq.destroy(new Error('transcription timed out')));
+      rq.on('error', reject);
+      rq.write(body);
+      rq.end();
+    });
+  // Prefer the cheaper 4o-mini transcription model; fall back to whisper-1 if
+  // this account/model combination rejects it.
+  return tryModel('gpt-4o-mini-transcribe').catch((err) => {
+    if (/model/i.test(err.message) || /HTTP 40[04]/.test(err.message)) return tryModel('whisper-1');
+    throw err;
+  });
+}
+
 // ---- helpers ----
 function json(res, code, obj) {
   const body = JSON.stringify(obj);
@@ -173,6 +234,36 @@ const server = http.createServer(async (req, res) => {
     subscribers.add(res);
     const ping = setInterval(() => res.write(': ping\n\n'), 15000);
     req.on('close', () => { clearInterval(ping); subscribers.delete(res); });
+    return;
+  }
+
+  if (req.method === 'POST' && u.pathname === '/api/transcribe') {
+    let keys;
+    try { keys = loadKeys(); } catch (err) { return json(res, 500, { error: err.message }); }
+    if (!keys.openai) return json(res, 400, { error: 'Voice input needs OPENAI_API_KEY configured.' });
+    const chunks = [];
+    let size = 0;
+    let aborted = false;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > 20e6 && !aborted) { // OpenAI caps uploads at 25MB; stop earlier
+        aborted = true;
+        json(res, 413, { error: 'Recording too large (20MB cap) - keep it under ~2 minutes.' });
+        req.destroy();
+        return;
+      }
+      if (!aborted) chunks.push(c);
+    });
+    req.on('end', async () => {
+      if (aborted) return;
+      if (!chunks.length) return json(res, 400, { error: 'No audio received.' });
+      try {
+        const text = await transcribeAudio(Buffer.concat(chunks), req.headers['content-type'], keys.openai);
+        json(res, 200, { text });
+      } catch (err) {
+        json(res, 502, { error: `Transcription failed: ${err.message}` });
+      }
+    });
     return;
   }
 
