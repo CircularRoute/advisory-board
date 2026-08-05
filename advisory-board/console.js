@@ -207,6 +207,42 @@ function isAdminReq(req) {
   return auth.isAdminEmail(auth.sessionEmail(req.headers.cookie));
 }
 
+// Injected into the page ONLY for admin requests (see the '/' route). Talks
+// to the main script through window.__board; polls briefly because the main
+// script initialises asynchronously.
+const ADMIN_FRAGMENT = `
+      <div class="card" id="adminCard">
+        <h2>All questions — admin</h2>
+        <ul class="runlist" id="historyList"><li>Loading...</li></ul>
+        <div class="hint">Every question put to the board: who asked it, when, at which tier, and what it cost. Tap a row for the full report including the final response. Only you see this section.</div>
+      </div>
+      <script>
+      (function () {
+        function init() {
+          var B = window.__board;
+          B.apiFetch('/api/history').then(function (r) { return r.json(); }).then(function (hist) {
+            var el = document.getElementById('historyList');
+            if (!hist.length) { el.innerHTML = '<li>No runs yet.</li>'; return; }
+            el.innerHTML = hist.map(function (h) {
+              var q = h.question.length > 160 ? h.question.slice(0, 160) + '\\u2026' : h.question;
+              return '<li class="hrow" data-dir="' + B.esc(h.dir) + '"><span class="q">' + B.esc(q) + '</span>' +
+                '<span class="sub">' + B.esc(h.askedBy || 'unknown') + ' \\u00b7 ' +
+                B.esc((h.at || '').slice(0, 16).replace('T', ' ')) + ' \\u00b7 ' + B.esc(h.tier) +
+                (h.costUsd != null ? ' \\u00b7 $' + h.costUsd.toFixed(2) + (h.outOfPocketUsd ? ' (oop $' + h.outOfPocketUsd.toFixed(2) + ')' : '') : '') +
+                '</span></li>';
+            }).join('');
+            el.querySelectorAll('li[data-dir]').forEach(function (li) {
+              li.addEventListener('click', function () { B.openReport(li.dataset.dir); });
+            });
+          }).catch(function () {
+            document.getElementById('historyList').innerHTML = '<li>Could not load history.</li>';
+          });
+        }
+        if (window.__board) init();
+        else window.addEventListener('board-ready', init, { once: true });
+      })();
+      <\/script>`;
+
 // The full record every question leaves behind, for the admin view: who
 // asked, the question, the final response, and what it cost us.
 function listHistory() {
@@ -246,10 +282,17 @@ function safeRunFile(dirName, file) {
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, `http://${HOST}:${PORT}`);
 
-  // Public: the UI shell (no secrets in it) and the health check.
+  // Public: the UI shell and the health check. The page carries ZERO trace of
+  // the admin function unless this very request belongs to the admin - the
+  // fragment is injected server-side at a neutral marker, so non-admins can't
+  // learn it exists even from the page source. no-store so no cache can ever
+  // hand the admin variant to someone else.
   if (req.method === 'GET' && (u.pathname === '/' || u.pathname === '/index.html')) {
-    const html = readFileSync(path.join(__dirname, 'public', 'console.html'));
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    let html = readFileSync(path.join(__dirname, 'public', 'console.html'), 'utf8');
+    // Function form: a plain string replacement would interpret $-patterns
+    // (the fragment contains "$'", which splices in the rest of the page).
+    html = html.replace('<!-- @X@ -->', () => (isAdminReq(req) ? ADMIN_FRAGMENT : ''));
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
     return res.end(html);
   }
   if (req.method === 'GET' && u.pathname === '/healthz') {
@@ -322,13 +365,11 @@ ${ok
 
   if (req.method === 'GET' && u.pathname === '/auth/me') {
     const email = MAGIC ? auth.sessionEmail(req.headers.cookie) : null;
-    return json(res, 200, {
-      authed: authed(req, u),
-      email,
-      admin: isAdminReq(req),
-      magic: MAGIC,
-      hosted: HOSTED,
-    });
+    // The admin field exists only in responses to the admin - its absence is
+    // indistinguishable from the feature not existing.
+    const payload = { authed: authed(req, u), email, magic: MAGIC, hosted: HOSTED };
+    if (isAdminReq(req)) payload.admin = true;
+    return json(res, 200, payload);
   }
 
   if (req.method === 'POST' && u.pathname === '/auth/logout') {
@@ -360,7 +401,9 @@ ${ok
   }
 
   if (req.method === 'GET' && u.pathname === '/api/history') {
-    if (!isAdminReq(req)) return json(res, 403, { error: 'admin only' });
+    // Non-admins get the same 404 as any unknown route - probing this path
+    // must not reveal that an admin function exists.
+    if (!isAdminReq(req)) return json(res, 404, { error: 'not found' });
     return json(res, 200, listHistory());
   }
 

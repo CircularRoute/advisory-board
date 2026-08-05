@@ -236,11 +236,7 @@
         <ul class="runlist" id="runlist"><li>Loading...</li></ul>
       </div>
 
-      <div class="card" id="adminCard" hidden>
-        <h2>All questions — admin</h2>
-        <ul class="runlist" id="historyList"><li>Loading...</li></ul>
-        <div class="hint">Every question put to the board: who asked it, when, at which tier, and what it cost. Tap a row for the full report including the final response. Visible only to the admin account.</div>
-      </div>
+<!-- @X@ -->
     </div>
 
     <div>
@@ -355,9 +351,8 @@
     throw err;
   }
 
-  // Signed-in indicator (magic-link sessions only) + admin history
+  // Signed-in indicator (magic-link sessions only)
   fetch('/auth/me').then((r) => r.json()).then((me) => {
-    if (me.admin) loadAdminHistory();
     if (me.email) {
       const el = document.createElement('span');
       el.className = 'who';
@@ -531,27 +526,10 @@
     $('reportBody').innerHTML = md(text);
     $('reportDlg').showModal();
   }
-
-  // Admin: the history of all questions - who asked, when, tier, cost.
-  async function loadAdminHistory() {
-    $('adminCard').hidden = false;
-    try {
-      const hist = await (await apiFetch('/api/history')).json();
-      const el = $('historyList');
-      if (!hist.length) { el.innerHTML = '<li>No runs yet.</li>'; return; }
-      el.innerHTML = hist.map((h) =>
-        '<li class="hrow" data-dir="' + esc(h.dir) + '"><span class="q">' +
-        esc(h.question.length > 160 ? h.question.slice(0, 160) + '…' : h.question) + '</span>' +
-        '<span class="sub">' + esc(h.askedBy || 'unknown') + ' · ' +
-        esc((h.at || '').slice(0, 16).replace('T', ' ')) + ' · ' + esc(h.tier) +
-        (h.costUsd != null ? ' · $' + h.costUsd.toFixed(2) + (h.outOfPocketUsd ? ' (oop $' + h.outOfPocketUsd.toFixed(2) + ')' : '') : '') +
-        '</span></li>'
-      ).join('');
-      el.querySelectorAll('li[data-dir]').forEach((li) => li.addEventListener('click', () => openReport(li.dataset.dir)));
-    } catch {
-      $('historyList').innerHTML = '<li>Could not load history.</li>';
-    }
-  }
+  // Small stable surface for server-injected page fragments, announced with
+  // an event so fragments never depend on load-order timing.
+  window.__board = { apiFetch, esc, md, openReport };
+  window.dispatchEvent(new Event('board-ready'));
   $('dlgClose').addEventListener('click', () => $('reportDlg').close());
 
   // voice input: record with MediaRecorder, transcribe server-side via
