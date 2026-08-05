@@ -21,7 +21,10 @@ console, magic-link auth + PWA, extended boards with roles, live session screen)
   non-sitting Chairman). Zero npm dependencies, Node 18+.
   - `lib/config.js` - tiers/prices/chairman/extended-seat pattern/key loading. The one
     file to edit when models change.
-  - `lib/council.js` - engine + ROLES (7) + structured `onEvent` stream for the live UI.
+  - `lib/council.js` - engine + ROLES (12: contrarian, expansionist, outsider, executor,
+    psychologist, tradeoff, arbiter, scout, analyst, futurist, economist, advocate) +
+    structured `onEvent` stream for the live UI. The no-role state is labeled "Default"
+    in the UI (renamed from "Objective", 2026-08-05).
   - `lib/auth.js` - magic-link email auth (Brevo), sessions, admin check.
   - `console.js` - HTTP server: UI, SSE, transcription, history, admin injection.
   - `public/console.html` - the whole UI (vanilla, one file). `public/icons/` + manifest = PWA.

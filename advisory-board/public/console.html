@@ -591,9 +591,9 @@
   const fmt = (n) => '$' + n.toFixed(2);
 
   const SIZE_HINTS = {
-    3: 'Three objective members - one per seated provider.',
-    5: 'Adds a Claude and a GPT seat at the board tier, each with an assigned perspective role. The first three members stay objective.',
-    7: 'Adds a second Claude, GPT and Gemini seat plus a third Claude, each with a role. The first three members stay objective.',
+    3: 'Three default members - one per seated provider.',
+    5: 'Adds a Claude and a GPT seat at the board tier, each with an assigned perspective role. The first three members keep the default perspective.',
+    7: 'Adds a second Claude, GPT and Gemini seat plus a third Claude, each with a role. The first three members keep the default perspective.',
   };
 
   function render() {
@@ -616,7 +616,7 @@
         TIER_NAMES.map((t) => '<option value="' + t + '"' + (s.pin === t ? ' selected' : '') + '>' + t + ' (' + TIERS[t][p].model + ')</option>').join('') +
         '</select>' +
         '<select class="roleSel" aria-label="' + PLABEL[p] + ' role" data-p="' + p + '"' + (s.on ? '' : ' disabled') + '>' +
-        '<option value=""' + (!s.role ? ' selected' : '') + '>Objective</option>' +
+        '<option value=""' + (!s.role ? ' selected' : '') + '>Default</option>' +
         ROLE_LIST.map((r) => '<option value="' + r.key + '"' + (s.role === r.key ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('') +
         '</select>' +
         '<label class="switch"><input type="checkbox" data-p="' + p + '"' + (s.on ? ' checked' : '') + ' aria-label="Seat ' + PLABEL[p] + '"><span class="tr"></span><span class="th"></span></label>';
@@ -667,7 +667,7 @@
     const ros = fullRoster(state.tier);
     for (const m of ros) {
       const off = m.memberTier !== state.tier;
-      const chip = m.role ? esc(roleName(m.role)) : (m.extra ? 'choose a role' : 'Objective');
+      const chip = m.role ? esc(roleName(m.role)) : (m.extra ? 'choose a role' : 'Default');
       view.innerHTML += '<div class="member-chip"><span class="dot" style="background:' + PCOLOR[m.provider] + '"></span>' + m.model +
         ' <span class="rolechip">' + chip + '</span>' +
         '<span class="tiertag' + (off ? ' offtier' : '') + '">' + m.memberTier + (off ? ' seat on a ' + state.tier + ' board' : '-tier') + '</span></div>';
