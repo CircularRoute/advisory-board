@@ -36,8 +36,9 @@ services:
         sync: false
       - key: BREVO_API_KEY
         sync: false
-      - key: BREVO_SENDER_EMAIL
-        sync: false
+      # Verified Brevo sender for magic-link emails (tested 2026-08-05).
+      - key: BOARD_MAGIC_FROM
+        value: rashad@circularroute.com
       - key: BOARD_RUNS_DIR
         value: /var/data/runs
     disk:
