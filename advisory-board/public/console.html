@@ -178,7 +178,7 @@
   #loginMsg { font-size: 13px; margin-top: 12px; color: var(--ink-soft); line-height: 1.5; }
 
   @media (prefers-reduced-motion: reduce) {
-    .switch .tr, .switch .th, .runbtn, .seg button, .micbtn.rec { transition: none !important; animation: none !important; }
+    .switch .tr, .switch .th, .runbtn, .seg button, .micbtn.rec, .tcircle.active { transition: none !important; animation: none !important; }
   }
 
 
@@ -195,11 +195,27 @@
   .step.active { background: var(--ok-bg); color: var(--ok-ink); }
   .step.active .stepnum, .step.done .stepnum { background: var(--accent); }
   .step.done { color: var(--ink); }
-  .s-mem { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; padding: 11px 13px; background: var(--tint); border-radius: 11px; margin-bottom: 7px; font: 500 13px var(--mono); }
-  .s-mem .status { margin-left: auto; font: 500 12px var(--sans); color: var(--ink-soft); text-align: right; flex: none; max-width: 45%; }
-  .s-mem.working .status { color: var(--accent); }
-  .s-mem.failed .status { color: var(--err-ink); }
-  .pulse { animation: micpulse 1.4s infinite; }
+  .s-mem { padding: 12px 14px; background: var(--tint); border-radius: 12px; margin-bottom: 8px; transition: background 0.25s; }
+  .s-top { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font: 600 13.5px var(--mono); }
+  .s-tasks { display: flex; gap: 20px; margin-top: 10px; flex-wrap: wrap; }
+  .task { display: inline-flex; align-items: center; gap: 8px; font: 600 13.5px var(--sans); color: var(--ink-soft); }
+  .task.active { color: var(--accent); }
+  .task.done { color: var(--ink); }
+  .task.fail { color: var(--err-ink); }
+  .tcircle { width: 22px; height: 22px; border-radius: 50%; flex: none; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; box-sizing: border-box; }
+  .tcircle.pending { border: 2px solid #D2D2D7; }
+  .tcircle.active { border: 3px solid #CFE5D8; border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+  .tcircle.done { background: var(--accent); color: #fff; }
+  .tcircle.fail { background: var(--err-ink); color: #fff; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .s-mem.chair { box-shadow: inset 3px 0 0 var(--accent); }
+  .s-mem.chairing { background: var(--accent); }
+  .s-mem.chairing .s-top, .s-mem.chairing .task { color: #fff; }
+  .s-mem.chairing .rolechip { background: rgba(255,255,255,0.18); border-color: transparent; color: #fff; }
+  .s-mem.chairing .tcircle.active { border-color: rgba(255,255,255,0.35); border-top-color: #fff; }
+  .s-mem.failed { opacity: 0.75; }
+  .pbar { height: 6px; background: var(--tint); border-radius: 3px; margin: 0 0 18px; overflow: hidden; }
+  .pbar div { height: 100%; width: 4%; background: var(--accent); border-radius: 3px; transition: width 0.6s ease; }
   .rolechip { font: 600 10px var(--sans); text-transform: uppercase; letter-spacing: 0.06em; background: #fff; border: 1px solid var(--line); padding: 2px 8px; border-radius: 999px; color: var(--ink-soft); flex: none; }
   #sFeed { font: 400 12px/1.8 var(--mono); background: var(--tint); border-radius: 12px; padding: 12px 14px; max-height: 240px; overflow-y: auto; margin-top: 14px; white-space: pre-wrap; word-break: break-word; }
   #sConsensus .banner { margin-top: 4px; }
@@ -337,6 +353,7 @@
         <div class="step" data-n="2"><span class="stepnum">2</span> Blind peer review</div>
         <div class="step" data-n="3"><span class="stepnum">3</span> Chairman synthesis</div>
       </div>
+      <div class="pbar"><div id="pfill"></div></div>
       <div id="sMembers"></div>
       <div id="sConsensus"></div>
       <div id="sFeed" aria-live="polite"></div>
@@ -826,7 +843,8 @@
     $('session').hidden = false;
     $('sQuestion').textContent = question;
     $('sMembers').innerHTML = ''; $('sConsensus').innerHTML = ''; $('sFeed').textContent = ''; $('sResults').innerHTML = '';
-    $('backBtn').hidden = true;
+    $('backBtn').hidden = false;
+    $('backBtn').disabled = true;
     S.rows.clear(); S.names.clear();
     setStep(0);
     window.scrollTo({ top: 0 });
@@ -848,15 +866,22 @@
       s.classList.toggle('active', k === n);
       s.classList.toggle('done', k < n);
     });
+    const fills = { 0: '4%', 1: '18%', 2: '55%', 3: '85%', 4: '100%' };
+    const f = $('pfill');
+    if (f) f.style.width = fills[n] || '4%';
   }
-  function setStatus(seat, text, opts = {}) {
-    const d = S.rows.get(seat);
-    if (!d) return;
-    const st = d.querySelector('.status');
-    st.textContent = text;
-    st.classList.toggle('pulse', !!opts.pulse);
-    d.classList.toggle('working', !!opts.pulse);
-    if (opts.failed) { d.classList.add('failed'); d.classList.remove('working'); }
+  function taskHtml(key, label, state) {
+    return '<span class="task ' + state + '" data-task="' + key + '"><span class="tcircle ' + state + '"></span><span class="tlabel">' + label + '</span></span>';
+  }
+  function setTask(row, key, state, label) {
+    if (!row) return;
+    const t = row.querySelector('[data-task="' + key + '"]');
+    if (!t) return;
+    t.className = 'task ' + state;
+    const c = t.querySelector('.tcircle');
+    c.className = 'tcircle ' + state;
+    c.textContent = state === 'done' ? '\u2713' : (state === 'fail' ? '\u2715' : '');
+    if (label) t.querySelector('.tlabel').textContent = label;
   }
   function engineEvent(tier, e) {
     const P = state.compare ? '[' + tier + '] ' : '';
@@ -865,68 +890,80 @@
       e.members.forEach((m) => {
         S.names.set(m.seat, m.name);
         const d = document.createElement('div');
-        d.className = 's-mem working';
-        d.innerHTML = '<span class="dot" style="background:' + PCOLOR[m.provider] + '"></span>' + esc(m.name) +
-          (m.role ? ' <span class="rolechip">' + esc(m.role) + '</span>' : '') +
-          '<span class="status pulse">thinking…</span>';
+        d.className = 's-mem';
+        d.innerHTML = '<div class="s-top"><span class="dot" style="background:' + PCOLOR[m.provider] + '"></span><span class="s-name">' + esc(m.name) + '</span>' +
+          (m.role ? ' <span class="rolechip">' + esc(m.role) + '</span>' : '') + '</div>' +
+          '<div class="s-tasks">' + taskHtml('opinion', 'Answering\u2026', 'active') + taskHtml('review', 'Peer review', 'pending') + '</div>';
         $('sMembers').appendChild(d);
         S.rows.set(m.seat, d);
       });
       const c = document.createElement('div');
-      c.className = 's-mem chair-chip';
+      c.className = 's-mem chair';
       c.id = 'sChairRow';
-      c.innerHTML = '<span class="dot" style="background:' + PCOLOR[e.chairman.provider] + '"></span>' + esc(e.chairman.model) +
-        ' <span class="rolechip">chairman</span><span class="status">waiting for the board</span>';
+      c.innerHTML = '<div class="s-top"><span class="dot" style="background:' + PCOLOR[e.chairman.provider] + '"></span><span class="s-name">' + esc(e.chairman.model) + '</span> <span class="rolechip">Chairman</span></div>' +
+        '<div class="s-tasks">' + taskHtml('synth', 'Waiting for the board', 'pending') + '</div>';
       $('sMembers').appendChild(c);
       feed(P + 'Board seated: ' + e.members.map((m) => m.name + (m.role ? ' (' + m.role + ')' : '')).join(', '));
-      feed(P + 'Chairman: ' + e.chairman.model + ' (' + e.chairman.source + ')');
+      feed(P + 'Chairman: ' + e.chairman.model);
     }
     if (e.t === 'stage') {
       setStep(e.n);
-      if (e.n === 1) feed(P + '— Stage 1: every member answers independently, nobody sees anyone else —');
+      if (e.n === 1) feed(P + 'Stage 1 - every member writes an independent answer.');
       if (e.n === 2) {
-        S.rows.forEach((d, seat) => { if (!d.classList.contains('failed')) setStatus(seat, 'reviewing peers…', { pulse: true }); });
-        feed(P + '— Stage 2: blind peer review - identities stripped, order shuffled per reviewer —');
+        S.rows.forEach((d) => { if (!d.classList.contains('failed')) setTask(d, 'review', 'active', 'Reviewing peers\u2026'); });
+        feed(P + "Stage 2 - members review each other's answers anonymously.");
       }
-      if (e.n === 3) feed(P + '— Stage 3: the chairman reconciles and names the disagreements —');
+      if (e.n === 3) feed(P + 'Stage 3 - the chairman writes the final answer.');
     }
     if (e.t === 'opinion-done') {
-      setStatus(e.seat, 'answered · ' + e.outputTokens + ' tok · ' + Math.round(e.ms / 1000) + 's');
-      feed(P + (S.names.get(e.seat) || 'member') + ' delivered an answer (' + Math.round(e.ms / 1000) + 's)');
+      setTask(S.rows.get(e.seat), 'opinion', 'done', 'Answered');
+      feed(P + (S.names.get(e.seat) || 'member') + ' answered (' + Math.round(e.ms / 1000) + 's)');
     }
     if (e.t === 'opinion-failed') {
-      setStatus(e.seat, 'failed', { failed: true });
-      feed(P + '⚠ ' + (S.names.get(e.seat) || 'member') + ' FAILED: ' + e.error);
+      const d = S.rows.get(e.seat);
+      if (d) d.classList.add('failed');
+      setTask(d, 'opinion', 'fail', 'Failed');
+      feed(P + '\u26A0 ' + (S.names.get(e.seat) || 'member') + ' failed: ' + e.error);
     }
     if (e.t === 'review-done') {
-      setStatus(e.seat, e.ranking ? 'ranked: ' + e.ranking.join(' → ') : 'review in (ranking unparseable)');
-      feed(P + (S.names.get(e.seat) || 'member') + (e.ranking ? ' ranked the peers: ' + e.ranking.join(' → ') : ' returned a review, but the ranking was unparseable'));
+      setTask(S.rows.get(e.seat), 'review', 'done', 'Review done');
+      feed(P + (S.names.get(e.seat) || 'member') + ' finished the peer review');
     }
     if (e.t === 'review-failed') {
-      setStatus(e.seat, 'review failed', { failed: true });
-      feed(P + '⚠ ' + (S.names.get(e.seat) || 'member') + ' review FAILED: ' + e.error);
+      setTask(S.rows.get(e.seat), 'review', 'fail', 'Review failed');
+      feed(P + '\u26A0 ' + (S.names.get(e.seat) || 'member') + ' review failed');
     }
     if (e.t === 'consensus') {
       const lb = (e.leaderboard || []).filter((x) => x.avgPosition != null);
       if (lb.length) {
-        $('sConsensus').innerHTML = '<div class="banner ok">🏆 Blind peer ranking: ' +
-          lb.map((x, i) => (i + 1) + '. ' + esc(x.member)).join(' &nbsp;·&nbsp; ') +
-          (String(e.confidence || '').startsWith('normal') ? '' : ' <em>(low confidence)</em>') + '</div>';
-        feed(P + 'Consensus check: the board blind-ranked ' + lb.map((x, i) => (i + 1) + '. ' + x.member).join(', '));
+        const few = lb.length < 3;
+        $('sConsensus').innerHTML = '<div class="banner ok"><strong>Board vote.</strong> Each member read the others\u2019 answers without knowing who wrote them, and rated them. Best-rated: ' +
+          lb.map((x, i) => (i + 1) + '. ' + esc(x.member)).join(' &nbsp;\u00b7&nbsp; ') +
+          (few ? ' <em>(small board \u2014 treat as a preference, not a verdict)</em>' : '') + '</div>';
+        feed(P + 'Board vote in: best-rated answer came from ' + lb[0].member);
       }
     }
     if (e.t === 'chairman-start') {
       const c = $('sChairRow');
-      if (c) { c.classList.add('working'); const st = c.querySelector('.status'); st.textContent = (e.fallback ? 'fallback chair · ' : '') + 'synthesising…'; st.classList.add('pulse'); }
-      if (e.fallback) feed(P + '⚠ default chairman failed - fallback chairman ' + e.model + ' takes over');
+      if (c) {
+        c.classList.add('chairing');
+        setTask(c, 'synth', 'active', e.fallback ? 'Fallback chairman synthesising\u2026' : 'Synthesising the final answer\u2026');
+      }
+      if (e.fallback) feed(P + '\u26A0 default chairman failed - ' + e.model + ' takes over');
     }
     if (e.t === 'chairman-done') {
       const c = $('sChairRow');
-      if (c) { c.classList.remove('working'); const st = c.querySelector('.status'); st.textContent = 'synthesis complete · ' + Math.round(e.ms / 1000) + 's'; st.classList.remove('pulse'); }
-      feed(P + 'The chairman finished the synthesis (' + Math.round(e.ms / 1000) + 's)');
+      if (c) {
+        c.classList.remove('chairing');
+        setTask(c, 'synth', 'done', 'Final answer ready');
+      }
+      feed(P + 'Chairman finished (' + Math.round(e.ms / 1000) + 's)');
     }
     if (e.t === 'title') feed(P + 'Filed as: ' + e.title);
   }
+  // Dev/simulation hooks (generic surface, no auth implications)
+  window.__board.engineEvent = engineEvent;
+  window.__board.openSession = openSession;
   function renderResults(results) {
     $('sResults').innerHTML = results.map((r) => {
       const lb = r.leaderboard.entries.map((x, i) => (i + 1) + '. ' + esc(x.member) + (x.avgPosition != null ? ' (avg ' + x.avgPosition.toFixed(2) + ')' : '')).join(' &nbsp; ');
@@ -986,18 +1023,17 @@
     }
     if (e.type === 'engine') { engineEvent(e.tier, e.e); return; }
     if (e.type === 'started') { if ($('session').hidden) openSession('(board convened elsewhere - live feed)'); feed('board convened (' + (e.opts.compare && e.opts.compare.length ? 'Calibrate: ' + e.opts.compare.join(', ') : 'tier: ' + e.opts.tier) + ')'); }
-    if (e.type === 'log') feed('· ' + e.line);
     if (e.type === 'run-done') feed('record saved: ' + e.dir);
     if (e.type === 'error') {
       feed('⚠ ERROR: ' + e.message);
       $('sResults').innerHTML = '<div class="banner err">' + esc(e.message) + '</div>';
-      $('backBtn').hidden = false;
+      $('backBtn').disabled = false;
       state.running = false; render();
     }
     if (e.type === 'done') {
       setStep(4);
       renderResults(e.results);
-      $('backBtn').hidden = false;
+      $('backBtn').disabled = false;
       state.running = false;
       render(); refreshRuns();
     }
