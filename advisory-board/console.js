@@ -177,6 +177,25 @@ function json(res, code, obj) {
   res.writeHead(code, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) });
   res.end(body);
 }
+// Buffer a small JSON-ish body with a hard size cap. Over-limit requests get
+// an immediate error response and the rest of the upload is drained, not
+// buffered - /auth/request is unauthenticated, so an unbounded `body += c`
+// would be a free memory sink.
+function readBody(req, res, limit, cb) {
+  let body = '';
+  let over = false;
+  req.on('data', (c) => {
+    if (over) return;
+    if (body.length + c.length > limit) {
+      over = true;
+      json(res, 413, { error: 'request body too large' });
+      req.resume();
+      return;
+    }
+    body += c;
+  });
+  req.on('end', () => { if (!over) cb(body); });
+}
 function listRuns(limit = 25) {
   if (!existsSync(RUNS_DIR)) return [];
   const dirs = readdirSync(RUNS_DIR, { withFileTypes: true })
@@ -326,9 +345,7 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'POST' && u.pathname === '/auth/request') {
     if (!MAGIC) return json(res, 400, { error: 'Email sign-in is not configured on this deployment.' });
-    let body = '';
-    req.on('data', (c) => (body += c));
-    req.on('end', async () => {
+    readBody(req, res, 4096, async (body) => {
       let email;
       try { email = JSON.parse(body).email; } catch { return json(res, 400, { error: 'bad JSON' }); }
       try {
@@ -444,8 +461,12 @@ ${ok
       size += c.length;
       if (size > 20e6 && !aborted) { // OpenAI caps uploads at 25MB; stop earlier
         aborted = true;
+        chunks.length = 0;
         json(res, 413, { error: 'Recording too large (20MB cap) - keep it under ~2 minutes.' });
-        req.destroy();
+        // Drain the rest instead of destroying the socket: destroy() would
+        // usually kill the response in flight and the client would see a
+        // network error, never this message.
+        req.resume();
         return;
       }
       if (!aborted) chunks.push(c);
@@ -465,9 +486,11 @@ ${ok
 
   if (req.method === 'POST' && u.pathname === '/api/run') {
     if (running) return json(res, 409, { error: 'A board is already convened; wait for it to finish.' });
-    let body = '';
-    req.on('data', (c) => (body += c));
-    req.on('end', () => {
+    readBody(req, res, 256 * 1024, (body) => {
+      // Re-check under the single-threaded event loop: the check above ran
+      // before the body arrived, so two near-simultaneous requests could both
+      // pass it - without this, both would convene and both would spend.
+      if (running) return json(res, 409, { error: 'A board is already convened; wait for it to finish.' });
       let opts;
       try { opts = JSON.parse(body); } catch { return json(res, 400, { error: 'bad JSON' }); }
       if (!opts.question || !String(opts.question).trim()) return json(res, 400, { error: 'A question is required.' });

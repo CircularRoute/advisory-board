@@ -96,6 +96,13 @@ const recentRequests = new Map(); // email -> [timestamps]
 function rateLimited(email) {
   const now = Date.now();
   const windowMs = 15 * 60 * 1000;
+  // The form is public, so every address ever submitted lands in this map -
+  // sweep fully-expired entries before adding more, or it grows without bound.
+  if (recentRequests.size >= 1000) {
+    for (const [k, v] of recentRequests) {
+      if (!v.some((t) => now - t < windowMs)) recentRequests.delete(k);
+    }
+  }
   const list = (recentRequests.get(email) || []).filter((t) => now - t < windowMs);
   if (list.length >= 3) return true;
   list.push(now);
