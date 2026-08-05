@@ -56,7 +56,8 @@
   @media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 
   .card { background: #fff; border: 1px solid var(--line); border-radius: var(--r-card); padding: 26px 24px; margin-bottom: 20px; box-shadow: var(--shadow-card); }
-  .card h2 { font: 600 12px var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 18px; }
+  .card h2 { font: 600 12px var(--sans); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 18px; display: flex; align-items: center; gap: 8px; }
+  .card h2 .count { margin-left: auto; font: 600 12px var(--mono); letter-spacing: 0; color: var(--ink-soft); background: var(--tint); padding: 2px 11px; border-radius: 999px; }
 
   .field { margin-bottom: 24px; }
   .field:last-child { margin-bottom: 0; }
@@ -320,7 +321,7 @@
       </div>
 
       <div class="card">
-        <h2>Past sessions</h2>
+        <h2>Past sessions <span class="count" id="runCount"></span></h2>
         <ul class="runlist" id="runlist"><li>Loading...</li></ul>
       </div>
 <!-- @X@ -->
@@ -724,8 +725,10 @@
 
   // ---------- past sessions: collapsible tabs ----------
   async function refreshRuns() {
-    const runs = await (await apiFetch('/api/runs')).json();
+    const data = await (await apiFetch('/api/runs')).json();
+    const runs = data.runs || [];
     const el = $('runlist');
+    $('runCount').textContent = data.total || 0;
     if (!runs.length) { el.innerHTML = '<li>No sessions yet.</li>'; return; }
     el.innerHTML = runs.map((r) => {
       const q = r.question || r.title || r.dir;

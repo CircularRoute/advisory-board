@@ -178,13 +178,13 @@ function json(res, code, obj) {
   res.end(body);
 }
 function listRuns(limit = 25) {
-  if (!existsSync(RUNS_DIR)) return [];
-  const dirs = readdirSync(RUNS_DIR, { withFileTypes: true })
+  if (!existsSync(RUNS_DIR)) return { total: 0, runs: [] };
+  const all = readdirSync(RUNS_DIR, { withFileTypes: true })
     .filter((d) => d.isDirectory() && d.name !== 'comparisons')
     .map((d) => d.name)
     .sort()
-    .reverse()
-    .slice(0, limit);
+    .reverse();
+  const dirs = all.slice(0, limit);
   const out = [];
   for (const dir of dirs) {
     try {
@@ -202,7 +202,7 @@ function listRuns(limit = 25) {
       });
     } catch { /* skip unreadable run dirs */ }
   }
-  return out;
+  return { total: all.length, runs: out };
 }
 // Admin: locally (no auth) the single user is the admin; hosted, only the
 // magic-link session whose email matches BOARD_ADMIN_EMAIL.
@@ -216,7 +216,7 @@ function isAdminReq(req) {
 // script initialises asynchronously.
 const ADMIN_FRAGMENT = `
       <div class="card" id="adminCard">
-        <h2>All questions — admin</h2>
+        <h2>All questions — admin <span class="count" id="histCount"></span></h2>
         <ul class="runlist" id="historyList"><li>Loading...</li></ul>
         <div class="hint">Every question put to the board: who asked it, when, at which tier, and what it cost. Tap a row for the full report including the final response. Only you see this section.</div>
       </div>
@@ -226,6 +226,7 @@ const ADMIN_FRAGMENT = `
           var B = window.__board;
           B.apiFetch('/api/history').then(function (r) { return r.json(); }).then(function (hist) {
             var el = document.getElementById('historyList');
+            document.getElementById('histCount').textContent = hist.length;
             if (!hist.length) { el.innerHTML = '<li>No runs yet.</li>'; return; }
             el.innerHTML = hist.map(function (h) {
               var q = h.question.length > 160 ? h.question.slice(0, 160) + '\\u2026' : h.question;
@@ -283,7 +284,19 @@ function safeRunFile(dirName, file) {
 }
 
 // ---- server ----
+// A bug in any single route must return a 500, never kill the process (an
+// uncaught throw in the handler would take the whole console down).
 const server = http.createServer(async (req, res) => {
+  try {
+    return await handle(req, res);
+  } catch (err) {
+    console.error('[console] request handler error:', err);
+    if (!res.headersSent) return json(res, 500, { error: 'internal error' });
+    res.end();
+  }
+});
+
+async function handle(req, res) {
   const u = new URL(req.url, `http://${HOST}:${PORT}`);
 
   // Public: the UI shell and the health check. The page carries ZERO trace of
@@ -506,7 +519,7 @@ ${ok
   }
 
   json(res, 404, { error: 'not found' });
-});
+}
 
 server.listen(PORT, HOST, () => {
   for (const p of auth.configProblems()) console.error(`[auth] WARNING: ${p} - email sign-in disabled`);
