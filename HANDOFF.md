@@ -97,6 +97,14 @@ user is admin.
 - **Fable/Opus refusals are member failures by design** - no server-side fallbacks; the
   board's identity guarantees matter more than rescue. Board sits short-handed, loudly.
 - **One run at a time** (409 on concurrent convene) - deliberate, it spends money.
+- **Runs survive drops two ways** (added 2026-08-05): (1) every run event is journaled
+  in memory and replayed to any SSE subscriber that connects mid-run, so a phone that
+  locks/reconnects rebuilds the live screen (EventSource auto-reconnects); (2)
+  `runs/inflight.json` tracks the sitting board - normal completion removes it, and if
+  the process dies mid-run (deploy!) the next boot converts it into a visible
+  "Interrupted" record in Past sessions/history. A run that errors while the process
+  lives leaves a "Failed" record. NEVER deploy while a board is in session - it still
+  kills the deliberation; it just no longer hides the corpse.
 - **Engine events**: `convene({onEvent})` emits roster/stage/opinion-done/review-done/
   consensus/chairman-start/done/title. Seats have identity (`seat` index + unique
   `seatName`) because one model can hold 3 seats on a 7-member board. The leaderboard

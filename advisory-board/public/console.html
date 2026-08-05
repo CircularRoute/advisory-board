@@ -144,6 +144,8 @@
   .roleWrap .hint, .seatBlurb { font-size: 15px; color: var(--ink); }
   /* Prices in session/history rows stand out from the surrounding meta text. */
   .pr { color: var(--ink); font-weight: 700; }
+  .s-patience { margin: 10px 0 14px; }
+  .s-patience b { color: var(--ink); font-variant-numeric: tabular-nums; }
   .seatBlurb { margin: -3px 0 9px 4px; }
 
   .runlist { list-style: none; margin: 0; padding: 0; }
@@ -358,6 +360,7 @@
         <div class="step" data-n="3"><span class="stepnum">3</span> Chairman synthesis</div>
       </div>
       <div class="pbar"><div id="pfill"></div></div>
+      <div class="s-patience hint" id="sPatience">In session for <b id="sElapsed">0:00</b>. Big boards deliberate for a while — 10–20 minutes is normal for 5–7 members at board tier. You can lock your phone or leave this screen; the board keeps working on the server and the finished answer is saved to Past sessions.</div>
       <div id="sMembers"></div>
       <div id="sConsensus"></div>
       <div id="sFeed" aria-live="polite"></div>
@@ -853,11 +856,26 @@
 
   // ---------- live session screen ----------
   const S = { rows: new Map(), names: new Map() };
+  let elapsedTimer = null, elapsedBase = null;
+  function startElapsed(fromIso) {
+    elapsedBase = fromIso ? new Date(fromIso).getTime() : Date.now();
+    if (isNaN(elapsedBase)) elapsedBase = Date.now();
+    if (elapsedTimer) clearInterval(elapsedTimer);
+    const tick = () => {
+      const s = Math.max(0, Math.floor((Date.now() - elapsedBase) / 1000));
+      $('sElapsed').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    };
+    tick();
+    elapsedTimer = setInterval(tick, 1000);
+  }
+  function stopElapsed() { if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; } }
   function openSession(question) {
     $('configGrid').style.display = 'none';
     $('session').hidden = false;
     $('sQuestion').textContent = question;
     $('sMembers').innerHTML = ''; $('sConsensus').innerHTML = ''; $('sFeed').textContent = ''; $('sResults').innerHTML = '';
+    $('sPatience').hidden = false;
+    startElapsed();
     $('backBtn').hidden = false;
     $('backBtn').disabled = true;
     S.rows.clear(); S.names.clear();
@@ -865,6 +883,7 @@
     window.scrollTo({ top: 0 });
   }
   function closeSession() {
+    stopElapsed();
     $('session').hidden = true;
     $('configGrid').style.display = '';
     render(); refreshRuns();
@@ -1031,23 +1050,29 @@
       state.running = e.running;
       if (e.running && $('session').hidden) {
         openSession('(a board is already in session - attaching to the live feed)');
-        feed('rejoined mid-session; showing events from now on');
+        feed('rejoined mid-session; replaying progress so far');
       }
       render();
       return;
     }
     if (e.type === 'engine') { engineEvent(e.tier, e.e); return; }
-    if (e.type === 'started') { if ($('session').hidden) openSession('(board convened elsewhere - live feed)'); feed('board convened (' + (e.opts.compare && e.opts.compare.length ? 'Calibrate: ' + e.opts.compare.join(', ') : 'tier: ' + e.opts.tier) + ')'); }
+    if (e.type === 'started') {
+      if ($('session').hidden) openSession('(board convened elsewhere - live feed)');
+      if (e.at) startElapsed(e.at);
+      feed('board convened (' + (e.opts.compare && e.opts.compare.length ? 'Calibrate: ' + e.opts.compare.join(', ') : 'tier: ' + e.opts.tier) + ')');
+    }
     if (e.type === 'run-done') feed('record saved: ' + e.dir);
     if (e.type === 'error') {
       feed('⚠ ERROR: ' + e.message);
       $('sResults').innerHTML = '<div class="banner err">' + esc(e.message) + '</div>';
+      stopElapsed(); $('sPatience').hidden = true;
       $('backBtn').disabled = false;
       state.running = false; render();
     }
     if (e.type === 'done') {
       setStep(4);
       renderResults(e.results);
+      stopElapsed(); $('sPatience').hidden = true;
       $('backBtn').disabled = false;
       state.running = false;
       render(); refreshRuns();

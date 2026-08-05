@@ -15,7 +15,7 @@
 
 const http = require('node:http');
 const crypto = require('node:crypto');
-const { readFileSync, readdirSync, existsSync } = require('node:fs');
+const { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync, mkdirSync } = require('node:fs');
 const path = require('node:path');
 
 const { loadKeys, TIERS, DEFAULT_TIER, DEFAULT_PROVIDERS, EXTENDED_SEAT_PROVIDERS } = require('./lib/config');
@@ -60,16 +60,104 @@ function isSecure(req) {
 // ---- single-run state + SSE fanout ----
 let running = false;
 const subscribers = new Set();
+// Every event of the current run is journaled so a client that reconnects
+// mid-run (phone locked, network blip - EventSource auto-reconnects) gets the
+// full session replayed instead of a frozen screen.
+let journal = [];
 function broadcast(event) {
+  if (event.type === 'started') journal = [];
+  journal.push(event);
   const line = `data: ${JSON.stringify(event)}\n\n`;
   for (const res of subscribers) res.write(line);
 }
 
+// ---- in-flight run marker: a deploy or crash mid-run must not erase the run ----
+// While a board sits, its question + per-seat progress live in inflight.json
+// on the runs disk. Normal completion removes it; if the process dies first,
+// the next boot converts it into a visible "interrupted" record instead of
+// letting a paid deliberation vanish without a trace.
+const INFLIGHT = path.join(RUNS_DIR, 'inflight.json');
+let inflight = null;
+function writeInflight() {
+  try { mkdirSync(RUNS_DIR, { recursive: true }); writeFileSync(INFLIGHT, JSON.stringify(inflight)); }
+  catch (err) { console.error('[console] could not write inflight marker:', err.message); }
+}
+function clearInflight() {
+  inflight = null;
+  try { if (existsSync(INFLIGHT)) unlinkSync(INFLIGHT); } catch { /* best-effort */ }
+}
+function trackInflight(e) {
+  if (!inflight || !e) return;
+  if (e.t === 'roster' && Array.isArray(e.members)) {
+    inflight.seats = e.members.map((m) => ({ seatName: m.name || m.model, opinion: 'pending', review: 'pending' }));
+  }
+  if (e.t === 'stage') inflight.stage = e.n;
+  const seat = inflight.seats && inflight.seats[e.seat];
+  if (e.t === 'opinion-done' && seat) seat.opinion = 'done';
+  if (e.t === 'opinion-failed' && seat) seat.opinion = 'failed';
+  if (e.t === 'review-done' && seat) seat.review = 'done';
+  if (e.t === 'review-failed' && seat) seat.review = 'failed';
+  if (e.t === 'chairman-start') inflight.chairman = e.model;
+  writeInflight();
+}
+function miniSlug(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'question';
+}
+const STAGE_NAMES = { 0: 'convening', 1: 'independent opinions', 2: 'blind peer review', 3: 'chairman synthesis' };
+function saveAbortedRecord(state, kind, reason) {
+  const at = new Date().toISOString();
+  const stampStr = at.replace(/[-:]/g, '').replace(/\..+/, '').replace('T', '-');
+  const title = `${kind === 'failed' ? 'Failed' : 'Interrupted'} - ${String(state.question || '').slice(0, 60)}`;
+  const dir = path.join(RUNS_DIR, `${stampStr}-${kind}-${miniSlug(state.question)}`);
+  mkdirSync(dir, { recursive: true });
+  const seats = state.seats || [];
+  writeFileSync(path.join(dir, 'run.json'), JSON.stringify({
+    title,
+    question: state.question || '',
+    tier: (state.tiers && state.tiers[0]) || 'unknown',
+    mixedTier: false,
+    startedAt: state.startedAt || null,
+    finishedAt: at,
+    members: seats.map((s) => ({ seatName: s.seatName })),
+    failedMembers: [],
+    cost: null,
+    askedBy: state.askedBy || null,
+    aborted: { kind, reason, stageReached: state.stage || 0 },
+  }, null, 2));
+  writeFileSync(path.join(dir, 'report.md'), `# Advisory Board - ${title}
+
+**⚠ This deliberation did not complete.** ${reason}
+
+## Question
+
+${state.question || '(unknown)'}
+
+## Progress before it stopped
+
+- Stage reached: ${STAGE_NAMES[state.stage || 0] || state.stage}
+${seats.length ? seats.map((s) => `- ${s.seatName}: answer ${s.opinion}, peer review ${s.review}`).join('\n') : '- The board had not been seated yet.'}
+
+No final answer was produced${seats.some((s) => s.opinion === 'done') ? ' (individual answers were given but never went through peer review and synthesis, so per board rules they are not reported)' : ''}. Tokens already spent are billed by the providers. Re-ask the question to convene a fresh board.
+`);
+  return dir;
+}
+
 async function startRun(opts) {
   running = true;
-  broadcast({ type: 'started', opts: { tier: opts.tier, providers: opts.providers, compare: opts.compare } });
+  broadcast({ type: 'started', at: new Date().toISOString(), opts: { tier: opts.tier, providers: opts.providers, compare: opts.compare } });
+  const tiersPlanned = opts.compare && opts.compare.length ? opts.compare : [opts.tier];
+  inflight = {
+    startedAt: new Date().toISOString(),
+    question: opts.question,
+    tiers: tiersPlanned,
+    providers: opts.providers,
+    askedBy: opts.askedBy || null,
+    stage: 0,
+    seats: [],
+  };
+  writeInflight();
   try {
-    const tiers = opts.compare && opts.compare.length ? opts.compare : [opts.tier];
+    const tiers = tiersPlanned;
     const results = [];
     for (const tier of tiers) {
       const run = await convene({
@@ -81,7 +169,7 @@ async function startRun(opts) {
         chairmanOverride: opts.chairman || null,
         keys: loadKeys(),
         log: (m) => broadcast({ type: 'log', tier, line: m }),
-        onEvent: (e) => broadcast({ type: 'engine', tier, e }),
+        onEvent: (e) => { trackInflight(e); broadcast({ type: 'engine', tier, e }); },
       });
       run.askedBy = opts.askedBy || null; // who convened this board (admin history)
       const dir = saveRun(run);
@@ -105,7 +193,12 @@ async function startRun(opts) {
     });
   } catch (err) {
     broadcast({ type: 'error', message: err.message });
+    // A run that dies while the process survives still leaves a record - the
+    // board's failures are part of its history, not something to hide.
+    try { if (inflight) saveAbortedRecord(inflight, 'failed', `The run stopped with an error: ${err.message}`); }
+    catch (e2) { console.error('[console] could not record failed run:', e2.message); }
   } finally {
+    clearInflight();
     running = false;
   }
 }
@@ -440,6 +533,9 @@ ${ok
       connection: 'keep-alive',
     });
     res.write(`data: ${JSON.stringify({ type: 'hello', running })}\n\n`);
+    // Reconnecting mid-run (phone unlocked, network back): replay the whole
+    // session so the live screen rebuilds instead of staying frozen.
+    if (running) for (const ev of journal) res.write(`data: ${JSON.stringify(ev)}\n\n`);
     subscribers.add(res);
     const ping = setInterval(() => res.write(': ping\n\n'), 15000);
     req.on('close', () => { clearInterval(ping); subscribers.delete(res); });
@@ -519,6 +615,20 @@ ${ok
   }
 
   json(res, 404, { error: 'not found' });
+}
+
+// If the previous process died mid-run (deploy restart, crash), turn the
+// stranded inflight marker into a visible "interrupted" record before serving.
+try {
+  if (existsSync(INFLIGHT)) {
+    const stranded = JSON.parse(readFileSync(INFLIGHT, 'utf8'));
+    const dir = saveAbortedRecord(stranded, 'interrupted',
+      'The server restarted while the board was in session (most likely a code deploy). The deliberation could not be recovered.');
+    unlinkSync(INFLIGHT);
+    console.log(`[console] recovered interrupted run -> ${path.basename(dir)}`);
+  }
+} catch (err) {
+  console.error('[console] inflight recovery failed:', err.message);
 }
 
 server.listen(PORT, HOST, () => {
