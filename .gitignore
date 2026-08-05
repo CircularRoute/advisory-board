@@ -1,0 +1,9 @@
+node_modules/
+sittings/
+advisory-board/runs/
+leaderboard.json
+verification-run.log
+.env
+.env.*
+!.env.example
+.DS_Store

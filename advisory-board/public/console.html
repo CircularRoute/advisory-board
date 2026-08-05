@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Advisory Board Console</title>
+<style>
+  :root {
+    --ground: #F6F8F5; --panel: #FFFFFF; --panel-2: #EEF2EC;
+    --ink: #1B221D; --ink-soft: #55605A; --line: #D8DFD8;
+    --accent: #1E824C; --accent-ink: #FFFFFF; --accent-soft: #E2F0E7;
+    --warn: #9A6A1B; --warn-soft: #F6ECD9; --err: #A33B2E; --err-soft: #F6E2DE;
+    --anthropic: #B75C3A; --openai: #0F8A74; --google: #3B6FC9;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --head: "Avenir Next", "Avenir", Seravek, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #131713; --panel: #1B201B; --panel-2: #232923;
+      --ink: #E4EAE3; --ink-soft: #9AA79E; --line: #313931;
+      --accent: #3FAE72; --accent-ink: #0C130E; --accent-soft: #1E3227;
+      --warn: #D9A84E; --warn-soft: #33290F; --err: #E07B6C; --err-soft: #3A211D;
+      --anthropic: #D07A55; --openai: #2FB79C; --google: #6D97DF;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.55; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 26px 20px 80px; }
+  header.masthead { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .masthead h1 { font-family: var(--head); font-weight: 600; font-size: 25px; letter-spacing: -0.01em; margin: 0; }
+  .masthead .org { font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; }
+  p.lede { color: var(--ink-soft); margin: 4px 0 24px; max-width: 66ch; }
+  .grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 18px; align-items: start; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; margin-bottom: 18px; }
+  .card h2 { font-family: var(--head); font-size: 12.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 14px; }
+  .field { margin-bottom: 16px; }
+  .field:last-child { margin-bottom: 0; }
+  .field > label, .field > .lab { display: block; font-weight: 600; font-size: 13.5px; margin-bottom: 6px; }
+  .hint { font-size: 12.5px; color: var(--ink-soft); margin-top: 5px; }
+  .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+  .seg button { font-family: var(--mono); font-size: 13px; padding: 7px 14px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 7px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .seat { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; }
+  .seat .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .seat .pname { font-weight: 600; width: 82px; flex: none; font-size: 13.5px; }
+  .seat select { font-family: var(--mono); font-size: 12px; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); min-width: 0; flex: 1; }
+  .seat.off { opacity: 0.55; }
+  .switch { position: relative; width: 36px; height: 20px; flex: none; margin-left: auto; }
+  .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .switch .tr { position: absolute; inset: 0; background: var(--line); border-radius: 10px; transition: background 0.15s; pointer-events: none; }
+  .switch .th { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: var(--panel); border-radius: 50%; transition: left 0.15s; pointer-events: none; box-shadow: 0 1px 2px rgba(0,0,0,0.25); }
+  .switch input:checked ~ .tr { background: var(--accent); }
+  .switch input:checked ~ .th { left: 18px; }
+  @media (prefers-reduced-motion: reduce) { .switch .tr, .switch .th, .runbtn { transition: none !important; } }
+  textarea, .chair-select { width: 100%; font-family: inherit; font-size: 14px; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  textarea { min-height: 84px; resize: vertical; }
+  .chair-select { font-family: var(--mono); font-size: 13px; }
+  .stat-row { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; padding: 4px 0; }
+  .stat-row .k { color: var(--ink-soft); }
+  .stat-row .v { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .stat-row.total { border-top: 1px solid var(--line); margin-top: 5px; padding-top: 9px; font-weight: 700; }
+  .oop { color: var(--warn); font-weight: 700; }
+  .banner { border-radius: 8px; padding: 9px 12px; font-size: 12.5px; margin-top: 10px; }
+  .banner.warn { background: var(--warn-soft); color: var(--warn); }
+  .banner.ok { background: var(--accent-soft); color: var(--accent); }
+  .banner.err { background: var(--err-soft); color: var(--err); }
+  .runbtn {
+    width: 100%; margin-top: 14px; padding: 12px; font-family: var(--head); font-size: 15px; font-weight: 600;
+    background: var(--accent); color: var(--accent-ink); border: none; border-radius: 8px; cursor: pointer; transition: opacity 0.15s;
+  }
+  .runbtn[disabled] { opacity: 0.5; cursor: not-allowed; }
+  .member-chip { display: flex; align-items: baseline; gap: 9px; font-family: var(--mono); font-size: 12.5px; padding: 7px 11px; background: var(--panel-2); border-radius: 7px; margin-bottom: 6px; }
+  .member-chip .dot { width: 8px; height: 8px; border-radius: 50%; align-self: center; flex: none; }
+  .member-chip .tiertag { margin-left: auto; font-size: 11px; color: var(--ink-soft); text-align: right; }
+  .member-chip .tiertag.offtier { color: var(--warn); font-weight: 700; }
+  .chair-chip { border-left: 3px solid var(--accent); }
+  #log { font-family: var(--mono); font-size: 12px; line-height: 1.7; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; max-height: 220px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; display: none; }
+  .result { border-top: 3px solid var(--accent); }
+  .result .meta { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); margin-bottom: 10px; }
+  .answer h3 { font-family: var(--head); font-size: 16px; margin: 18px 0 6px; }
+  .answer h4 { font-family: var(--head); font-size: 14px; margin: 14px 0 5px; }
+  .answer p, .answer li { font-size: 14px; }
+  .answer hr { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
+  .answer { overflow-wrap: break-word; }
+  .runlist { list-style: none; margin: 0; padding: 0; }
+  .runlist li { display: flex; gap: 10px; align-items: baseline; padding: 8px 4px; border-bottom: 1px solid var(--line); font-size: 13px; cursor: pointer; }
+  .runlist li:hover { background: var(--panel-2); }
+  .runlist .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .runlist .mono { font-family: var(--mono); font-size: 11.5px; color: var(--ink-soft); flex: none; font-variant-numeric: tabular-nums; }
+  .runlist .flag { color: var(--warn); font-weight: 700; }
+  dialog { max-width: 760px; width: 92vw; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); padding: 22px 26px; }
+  dialog::backdrop { background: rgba(0,0,0,0.45); }
+  dialog .close { float: right; font-family: var(--mono); border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); border-radius: 6px; padding: 4px 12px; cursor: pointer; }
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 11px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { font-family: var(--head); font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+  td.mono { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <span class="org">Advisory Board</span>
+    <h1>Board Console</h1>
+  </header>
+  <p class="lede">Convene a multi-vendor board on any hard question: pick the tier and seats, see the cost before you commit, press Run. Not tied to any project or dataset. Every run spends real API credit; the real cost is printed with the answer.</p>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>Configuration</h2>
+        <div class="field">
+          <span class="lab" id="tierlab">Board tier</span>
+          <div class="seg" role="group" aria-labelledby="tierlab" id="tierSeg"></div>
+          <div class="hint">Default to mid; use --compare (or the buttons below) to learn where top actually changes the answer for your questions.</div>
+        </div>
+        <div class="field">
+          <span class="lab">Seats</span>
+          <div id="seats"></div>
+          <div class="hint">A seat may sit at a different tier than the board - e.g. a top board with a mid Gemini.</div>
+        </div>
+        <div class="field">
+          <label for="chair">Chairman</label>
+          <select id="chair" class="chair-select"></select>
+          <div class="hint">Default: a non-sitting Anthropic model from another tier. If a mixed board seats the default chair, it walks tiers automatically.</div>
+        </div>
+        <div class="field">
+          <span class="lab">Tier comparison</span>
+          <div class="seg" id="cmpSeg">
+            <button data-cmp="" aria-pressed="true">single run</button>
+            <button data-cmp="mid,top" aria-pressed="false">mid vs top</button>
+            <button data-cmp="low,mid,top" aria-pressed="false">all three</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="q">The question</label>
+          <textarea id="q" placeholder="A hard, decision-shaped question. Give context: what the company is, the constraint, what a useful answer decides."></textarea>
+          <div class="hint">Never convene the board on a question a single model would answer just as well.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Past runs</h2>
+        <ul class="runlist" id="runlist"><li>Loading...</li></ul>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2>This board</h2>
+        <div id="boardView"></div>
+        <div id="estimate"></div>
+        <div id="banners"></div>
+        <button class="runbtn" id="runBtn">Convene the board</button>
+        <pre id="log" aria-live="polite"></pre>
+      </div>
+      <div id="results"></div>
+      <div class="card">
+        <h2>Tier table ($ per 1M tokens)</h2>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Tier</th><th>OpenAI</th><th>Anthropic</th><th>Google (out-of-pocket)</th></tr></thead>
+          <tbody id="priceRows"></tbody>
+        </table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<dialog id="reportDlg">
+  <button class="close" id="dlgClose">Close</button>
+  <div class="answer" id="reportBody"></div>
+</dialog>
+
+<script>
+(async function () {
+  const $ = (id) => document.getElementById(id);
+
+  // Hosted mode: every /api call carries the access key; a 401 prompts once
+  // and remembers the key locally. In local mode no key exists and this is a
+  // pass-through.
+  let KEY = localStorage.getItem('board_key') || '';
+  async function apiFetch(url, opts = {}) {
+    const headers = Object.assign({}, opts.headers || {}, KEY ? { authorization: 'Bearer ' + KEY } : {});
+    const r = await fetch(url, Object.assign({}, opts, { headers }));
+    if (r.status === 401) {
+      const k = window.prompt('This console is key-protected. Enter the access key:');
+      if (k && k.trim()) { KEY = k.trim(); localStorage.setItem('board_key', KEY); return apiFetch(url, opts); }
+      throw new Error('unauthorized');
+    }
+    return r;
+  }
+
+  const cfg = await (await apiFetch('/api/config')).json();
+  const TIERS = cfg.tiers;
+  const TIER_NAMES = Object.keys(TIERS);
+  const CHAIR_DEFAULT = { top: 'mid', mid: 'top', low: 'mid' };
+  const PROVIDERS = ['anthropic', 'openai', 'google'];
+  const PCOLOR = { anthropic: 'var(--anthropic)', openai: 'var(--openai)', google: 'var(--google)' };
+  const PLABEL = { anthropic: 'Anthropic', openai: 'OpenAI', google: 'Google' };
+  const EST = { opinionIn: 350, opinionOut: 2500, reviewOut: 2000, chairOut: 2800 };
+
+  const state = {
+    tier: cfg.defaultTier,
+    seats: {
+      anthropic: { on: cfg.defaultProviders.includes('anthropic'), pin: 'board' },
+      openai: { on: cfg.defaultProviders.includes('openai'), pin: 'board' },
+      google: { on: cfg.defaultProviders.includes('google'), pin: 'board' },
+    },
+    chair: 'default',
+    compare: '',
+    running: cfg.running,
+  };
+
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  // minimal markdown for chairman answers and reports
+  function md(text) {
+    const lines = esc(text).split('\n');
+    let out = '', inList = false;
+    const flush = () => { if (inList) { out += '</ul>'; inList = false; } };
+    for (const raw of lines) {
+      let l = raw.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>');
+      if (/^#{1,3} /.test(l)) { flush(); out += '<h3>' + l.replace(/^#+ /, '') + '</h3>'; }
+      else if (/^#{4,} /.test(l)) { flush(); out += '<h4>' + l.replace(/^#+ /, '') + '</h4>'; }
+      else if (/^\s*[-*] /.test(l)) { if (!inList) { out += '<ul>'; inList = true; } out += '<li>' + l.replace(/^\s*[-*] /, '') + '</li>'; }
+      else if (/^---+$/.test(l.trim())) { flush(); out += '<hr>'; }
+      else if (l.trim() === '') { flush(); }
+      else { flush(); out += '<p>' + l + '</p>'; }
+    }
+    flush();
+    return out;
+  }
+
+  function seatMember(p, tier) {
+    const t = state.seats[p].pin === 'board' ? tier : state.seats[p].pin;
+    return { provider: p, memberTier: t, model: TIERS[t][p].model, inPerM: TIERS[t][p].inPerM, outPerM: TIERS[t][p].outPerM };
+  }
+  function roster(tier) { return PROVIDERS.filter((p) => state.seats[p].on).map((p) => seatMember(p, tier)); }
+  function resolveChair(tier, ros) {
+    if (state.chair !== 'default') {
+      const [prov, tr] = state.chair.split('|');
+      const slot = TIERS[tr][prov];
+      return { provider: prov, model: slot.model, inPerM: slot.inPerM, outPerM: slot.outPerM, source: 'override', sitting: ros.some((m) => m.model === slot.model && m.provider === prov) };
+    }
+    let ct = CHAIR_DEFAULT[tier], slot = TIERS[ct].anthropic, source = 'default (Anthropic ' + ct + ')';
+    if (ros.some((m) => m.provider === 'anthropic' && m.model === slot.model)) {
+      const alt = TIER_NAMES.find((t) => !ros.some((m) => m.provider === 'anthropic' && m.model === TIERS[t].anthropic.model));
+      if (alt) { slot = TIERS[alt].anthropic; source = 'default, walked to ' + alt + ' (chair was seated)'; }
+    }
+    return { provider: 'anthropic', model: slot.model, inPerM: slot.inPerM, outPerM: slot.outPerM, source, sitting: ros.some((m) => m.provider === 'anthropic' && m.model === slot.model) };
+  }
+  function estimateRun(tier) {
+    const ros = roster(tier), chair = resolveChair(tier, ros), n = ros.length;
+    let prepaid = 0, oop = 0;
+    const add = (m, ti, to) => { const c = (ti / 1e6) * m.inPerM + (to / 1e6) * m.outPerM; if (m.provider === 'google') oop += c; else prepaid += c; };
+    for (const m of ros) { add(m, EST.opinionIn, EST.opinionOut); if (n >= 2) add(m, EST.opinionIn + (n - 1) * EST.opinionOut, EST.reviewOut); }
+    add(chair, EST.opinionIn + n * (EST.opinionOut + EST.reviewOut), EST.chairOut);
+    return { prepaid, oop };
+  }
+  const fmt = (n) => '$' + n.toFixed(2);
+
+  function render() {
+    $('tierSeg').innerHTML = TIER_NAMES.slice().reverse().map((t) => '<button data-tier="' + t + '" aria-pressed="' + (t === state.tier) + '">' + t + '</button>').join('');
+    document.querySelectorAll('#cmpSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cmp === state.compare)));
+
+    const seatsEl = $('seats');
+    seatsEl.innerHTML = '';
+    for (const p of PROVIDERS) {
+      const s = state.seats[p];
+      const row = document.createElement('div');
+      row.className = 'seat' + (s.on ? '' : ' off');
+      row.innerHTML =
+        '<span class="dot" style="background:' + PCOLOR[p] + '"></span><span class="pname">' + PLABEL[p] + '</span>' +
+        '<select aria-label="' + PLABEL[p] + ' seat tier" data-p="' + p + '"' + (s.on ? '' : ' disabled') + '>' +
+        '<option value="board"' + (s.pin === 'board' ? ' selected' : '') + '>board tier (' + TIERS[state.tier][p].model + ')</option>' +
+        TIER_NAMES.map((t) => '<option value="' + t + '"' + (s.pin === t ? ' selected' : '') + '>' + t + ' (' + TIERS[t][p].model + ')</option>').join('') +
+        '</select>' +
+        '<label class="switch"><input type="checkbox" data-p="' + p + '"' + (s.on ? ' checked' : '') + ' aria-label="Seat ' + PLABEL[p] + '"><span class="tr"></span><span class="th"></span></label>';
+      seatsEl.appendChild(row);
+    }
+    seatsEl.querySelectorAll('select').forEach((el) => el.addEventListener('change', (e) => { state.seats[e.target.dataset.p].pin = e.target.value; render(); }));
+    seatsEl.querySelectorAll('input[type=checkbox]').forEach((el) => el.addEventListener('change', (e) => { state.seats[e.target.dataset.p].on = e.target.checked; render(); }));
+
+    const prevChair = state.chair;
+    $('chair').innerHTML = '<option value="default">Default (non-sitting Anthropic, auto)</option>' +
+      PROVIDERS.map((p) => TIER_NAMES.map((t) => '<option value="' + p + '|' + t + '">' + PLABEL[p] + ' ' + t + ' (' + TIERS[t][p].model + ')</option>').join('')).join('');
+    $('chair').value = prevChair;
+
+    const view = $('boardView'), bannersEl = $('banners');
+    view.innerHTML = ''; bannersEl.innerHTML = '';
+    const ros = roster(state.tier);
+    const runBtn = $('runBtn');
+    if (ros.length < 2) {
+      view.innerHTML = '<div class="member-chip">A board needs at least two seats.</div>';
+      $('estimate').innerHTML = ''; runBtn.disabled = true; return;
+    }
+    for (const m of ros) {
+      const off = m.memberTier !== state.tier;
+      view.innerHTML += '<div class="member-chip"><span class="dot" style="background:' + PCOLOR[m.provider] + '"></span>' + m.model +
+        '<span class="tiertag' + (off ? ' offtier' : '') + '">' + m.memberTier + (off ? ' seat on a ' + state.tier + ' board' : '-tier') + '</span></div>';
+    }
+    const chair = resolveChair(state.tier, ros);
+    view.innerHTML += '<div class="member-chip chair-chip"><span class="dot" style="background:' + PCOLOR[chair.provider] + '"></span>' + chair.model + '<span class="tiertag">chairman - ' + chair.source + '</span></div>';
+
+    const tiersToRun = state.compare ? state.compare.split(',') : [state.tier];
+    let prepaid = 0, oop = 0;
+    for (const t of tiersToRun) { const e = estimateRun(t); prepaid += e.prepaid; oop += e.oop; }
+    $('estimate').innerHTML =
+      '<div class="stat-row"><span class="k">Estimated' + (tiersToRun.length > 1 ? ' (' + tiersToRun.length + ' runs)' : '') + ', prepaid credit</span><span class="v">' + fmt(prepaid) + '</span></div>' +
+      '<div class="stat-row"><span class="k">Out-of-pocket (Google)</span><span class="v' + (oop > 0 ? ' oop' : '') + '">' + fmt(oop) + '</span></div>' +
+      '<div class="stat-row total"><span class="k">Total, roughly</span><span class="v">' + fmt(prepaid + oop) + '</span></div>' +
+      '<div class="hint">Rough estimate only; the real cost is printed after the run.</div>';
+
+    if (state.seats.google.on) bannersEl.innerHTML += '<div class="banner warn">Gemini is seated: its share spends real money (Anthropic and OpenAI draw prepaid credit).</div>';
+    if (chair.sitting) bannersEl.innerHTML += '<div class="banner warn">This chairman sits on the board - a known bias risk. The record will flag it.</div>';
+    runBtn.disabled = state.running;
+    runBtn.textContent = state.running ? 'Board in session...' : (tiersToRun.length > 1 ? 'Convene at ' + tiersToRun.length + ' tiers' : 'Convene the board');
+  }
+
+  $('tierSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { state.tier = b.dataset.tier; render(); } });
+  $('cmpSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { state.compare = b.dataset.cmp; render(); } });
+  $('chair').addEventListener('change', (e) => { state.chair = e.target.value; render(); });
+
+  // price table
+  $('priceRows').innerHTML = TIER_NAMES.map((t) => {
+    const r = TIERS[t]; const cell = (m) => m.model + ' &nbsp;$' + m.inPerM + ' / $' + m.outPerM;
+    return '<tr><td><strong>' + t + '</strong></td><td class="mono">' + cell(r.openai) + '</td><td class="mono">' + cell(r.anthropic) + '</td><td class="mono">' + cell(r.google) + '</td></tr>';
+  }).join('');
+
+  // past runs
+  async function refreshRuns() {
+    const runs = await (await apiFetch('/api/runs')).json();
+    const el = $('runlist');
+    if (!runs.length) { el.innerHTML = '<li>No runs yet.</li>'; return; }
+    el.innerHTML = runs.map((r) =>
+      '<li data-dir="' + esc(r.dir) + '"><span class="t">' + esc(r.title) + '</span>' +
+      '<span class="mono">' + esc(r.tier) + (r.mixedTier ? '*' : '') + '</span>' +
+      (r.shortHanded ? '<span class="mono flag">short-handed</span>' : '') +
+      '<span class="mono">' + (r.costUsd != null ? '$' + r.costUsd.toFixed(2) : '') + '</span></li>'
+    ).join('');
+    el.querySelectorAll('li[data-dir]').forEach((li) => li.addEventListener('click', async () => {
+      const text = await (await apiFetch('/api/report?dir=' + encodeURIComponent(li.dataset.dir))).text();
+      $('reportBody').innerHTML = md(text);
+      $('reportDlg').showModal();
+    }));
+  }
+  $('dlgClose').addEventListener('click', () => $('reportDlg').close());
+
+  // run + live events
+  const logEl = $('log');
+  function logLine(s) { logEl.style.display = 'block'; logEl.textContent += s + '\n'; logEl.scrollTop = logEl.scrollHeight; }
+
+  $('runBtn').addEventListener('click', async () => {
+    const q = $('q').value.trim();
+    if (!q) { $('banners').innerHTML += '<div class="banner err">Write the question first.</div>'; return; }
+    const providers = PROVIDERS.filter((p) => state.seats[p].on).map((p) => state.seats[p].pin === 'board' ? p : p + ':' + state.seats[p].pin);
+    let chairman = null;
+    if (state.chair !== 'default') { const [prov, tr] = state.chair.split('|'); chairman = prov + ':' + TIERS[tr][prov].model; }
+    const body = { question: q, tier: state.tier, providers, chairman, compare: state.compare ? state.compare.split(',') : [] };
+    logEl.textContent = ''; $('results').innerHTML = '';
+    const resp = await apiFetch('/api/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    if (!resp.ok) { const e = await resp.json(); $('banners').innerHTML += '<div class="banner err">' + esc(e.error) + '</div>'; return; }
+    state.running = true; render();
+  });
+
+  // EventSource cannot set headers, so hosted mode passes the key as ?key=.
+  const es = new EventSource('/api/events' + (KEY ? '?key=' + encodeURIComponent(KEY) : ''));
+  es.onmessage = (ev) => {
+    const e = JSON.parse(ev.data);
+    if (e.type === 'hello') { state.running = e.running; render(); return; }
+    if (e.type === 'started') { logLine('board convened (' + (e.opts.compare && e.opts.compare.length ? 'compare: ' + e.opts.compare.join(', ') : 'tier: ' + e.opts.tier) + ')'); }
+    if (e.type === 'log') logLine('[' + e.tier + '] ' + e.line);
+    if (e.type === 'run-done') logLine('[' + e.tier + '] run recorded: ' + e.dir);
+    if (e.type === 'error') { logLine('ERROR: ' + e.message); state.running = false; render(); }
+    if (e.type === 'done') {
+      state.running = false; render(); refreshRuns();
+      $('results').innerHTML = e.results.map((r) => {
+        const lb = r.leaderboard.entries.map((x, i) => (i + 1) + '. ' + x.member + (x.avgPosition != null ? ' (avg ' + x.avgPosition.toFixed(2) + ')' : '')).join(' &nbsp; ');
+        return '<div class="card result"><h2>' + esc(r.tier) + ' tier - ' + esc(r.title) + '</h2>' +
+          '<div class="meta">' + r.members.map((m) => esc(m.model)).join(' + ') + ' | chairman ' + esc(r.chairman.model) + (r.chairman.isSittingMember ? ' (SITTING)' : '') +
+          ' | ' + fmt(r.cost.totalUsd) + ' (oop ' + fmt(r.cost.outOfPocketUsd) + ')' +
+          (r.failedMembers.length ? ' | SHORT-HANDED: ' + r.failedMembers.map((m) => esc(m.model)).join(', ') : '') + '</div>' +
+          (r.warnings.length ? '<div class="banner warn">' + r.warnings.map(esc).join('<br>') + '</div>' : '') +
+          '<div class="answer">' + md(r.finalAnswer) + '</div>' +
+          '<div class="meta" style="margin-top:10px">Leaderboard: ' + lb + ' | ' + esc(r.leaderboard.confidence) + '</div></div>';
+      }).join('');
+    }
+  };
+
+  // URL prefill, so an agent can hand a configured board to the human whose
+  // tap on Convene is the spend approval:
+  //   /?q=...&tier=top&providers=anthropic,openai,google:mid&chairman=anthropic|top&compare=mid,top
+  const qp = new URLSearchParams(location.search);
+  if (qp.get('tier') && TIERS[qp.get('tier')]) state.tier = qp.get('tier');
+  if (qp.get('providers')) {
+    for (const p of PROVIDERS) state.seats[p].on = false;
+    for (const spec of qp.get('providers').split(',')) {
+      const [p, pin] = spec.split(':');
+      if (state.seats[p]) { state.seats[p].on = true; state.seats[p].pin = pin && TIERS[pin] ? pin : 'board'; }
+    }
+  }
+  if (qp.get('chairman')) {
+    const [cp, ct] = qp.get('chairman').split('|');
+    if (PROVIDERS.includes(cp) && TIERS[ct]) state.chair = qp.get('chairman');
+  }
+  if (qp.get('compare') && ['mid,top', 'low,mid,top'].includes(qp.get('compare'))) state.compare = qp.get('compare');
+  if (qp.get('q')) $('q').value = qp.get('q');
+
+  render();
+  refreshRuns();
+})();
+</script>
+</body>
+</html>

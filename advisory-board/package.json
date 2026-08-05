@@ -1,0 +1,9 @@
+{
+  "name": "advisory-board",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-vendor deliberation engine: independent opinions, blind peer review, chairman synthesis. Advisory only.",
+  "main": "board.js",
+  "engines": { "node": ">=18" },
+  "scripts": { "board": "node board.js" }
+}

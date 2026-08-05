@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Advisory Board</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 16px/1.5 -apple-system, system-ui, sans-serif; max-width: 780px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.3rem; }
+  textarea { width: 100%; min-height: 7rem; font: inherit; padding: .5rem; box-sizing: border-box; }
+  input[type=password] { width: 100%; font: inherit; padding: .4rem; box-sizing: border-box; }
+  fieldset { border: 1px solid #8884; margin: .8rem 0; }
+  button { font: inherit; padding: .5rem 1.2rem; cursor: pointer; }
+  #status { color: #888; white-space: pre-wrap; }
+  #meta { font-weight: 600; margin: 1rem 0 .5rem; }
+  .warn { color: #b45309; white-space: pre-wrap; }
+  .section { margin-top: 1.2rem; }
+  .section h2 { font-size: 1.05rem; border-bottom: 1px solid #8884; padding-bottom: .2rem; }
+  .body { white-space: pre-wrap; }
+  small { color: #888; }
+</style>
+</head>
+<body>
+<h1>Advisory Board</h1>
+<p><small>Independent opinions → blind peer review → chairman synthesis. Surfaces disagreement; costs real money per question.</small></p>
+
+<label>Access key<br><input type="password" id="key" placeholder="shared secret"></label>
+
+<p><label>Question<br><textarea id="question" placeholder="Ask the board a hard question…"></textarea></label></p>
+
+<fieldset>
+  <legend>Tier</legend>
+  <label><input type="radio" name="tier" value="top"> top</label>
+  <label><input type="radio" name="tier" value="mid" checked> mid</label>
+  <label><input type="radio" name="tier" value="low"> low</label>
+</fieldset>
+
+<fieldset>
+  <legend>Providers</legend>
+  <label><input type="checkbox" name="prov" value="anthropic" checked> Anthropic</label>
+  <label><input type="checkbox" name="prov" value="openai" checked> OpenAI</label>
+  <label><input type="checkbox" name="prov" value="google"> Google <small>(no prepaid credit)</small></label>
+</fieldset>
+
+<button id="ask">Convene the board</button>
+<p id="status"></p>
+<div id="out"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+$("key").value = localStorage.getItem("ab_key") ?? "";
+
+$("ask").addEventListener("click", async () => {
+  const key = $("key").value.trim();
+  const question = $("question").value.trim();
+  if (!key) return alert("Enter the access key.");
+  if (!question) return alert("Enter a question.");
+  localStorage.setItem("ab_key", key);
+  const tier = document.querySelector("input[name=tier]:checked").value;
+  const providers = [...document.querySelectorAll("input[name=prov]:checked")].map(c => c.value);
+  if (providers.length < 2) return alert("Pick at least two providers.");
+
+  $("ask").disabled = true;
+  $("out").innerHTML = "";
+  $("status").textContent = `Board convened (${tier} tier). Stage 1 → 2 → 3 runs several minutes; leave this page open…`;
+  try {
+    const res = await fetch("/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
+      body: JSON.stringify({ question, tier, providers }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? res.statusText);
+    render(data);
+    $("status").textContent = "";
+  } catch (err) {
+    $("status").textContent = "ERROR: " + err.message;
+  } finally {
+    $("ask").disabled = false;
+  }
+});
+
+function esc(s) { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; }
+
+function render(r) {
+  const c = r.cost;
+  let html = `<p id="meta">TIER: ${esc(r.tier.toUpperCase())} · COST: $${c.totalUsd.toFixed(4)}${c.estimatedPricesUsed ? " (incl. estimated Gemini pricing)" : ""}<br>
+    <small>board: ${esc(r.board.join(" + "))} · chairman: ${esc(r.chairman)} · by provider: ${
+      Object.entries(c.byProvider).map(([p, v]) => `${esc(p)} $${v.toFixed(4)}`).join(" · ")}</small></p>`;
+  if (r.notes?.length) html += `<p class="warn">⚠ ${r.notes.map(esc).join("<br>⚠ ")}</p>`;
+  const sec = (title, body) => body ? `<div class="section"><h2>${title}</h2><div class="body">${esc(body)}</div></div>` : "";
+  html += sec("Final answer", r.finalAnswer);
+  html += sec("Where the board agreed", r.agreements);
+  html += sec("Where the board split", r.disagreements);
+  html += sec("What would resolve it", r.resolution);
+  html += `<div class="section"><h2>De-anonymised mapping</h2><div class="body">${
+    Object.entries(r.chairmanMapping ?? {}).map(([l, m]) => `Response ${esc(l)} = ${esc(m)}`).join("\n")}</div></div>`;
+  html += `<div class="section"><h2>Leaderboard (this sitting — confidence: ${esc(r.leaderboardConfidence)})</h2><div class="body">${
+    (r.sittingLeaderboard ?? []).map(e => `${esc(e.model)}: avg position ${e.avgPosition.toFixed(2)} (${e.votes} votes)`).join("\n")}</div></div>`;
+  $("out").innerHTML = html;
+}
+</script>
+</body>
+</html>

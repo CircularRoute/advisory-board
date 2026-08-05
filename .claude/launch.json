@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "advisory-board-console",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["/Users/rashadabbasov/Desktop/Claude Playground/Advisory Board/advisory-board/console.js"],
+      "port": 4821
+    }
+  ]
+}
