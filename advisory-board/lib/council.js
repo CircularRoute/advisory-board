@@ -362,7 +362,7 @@ async function convene({ question, tier, providers, chairmanOverride, keys, log 
       },
       keys
     );
-    title = t.text.trim().replace(/["\n]/g, '').slice(0, 80) || title;
+    title = t.text.trim().replace(/^#+\s*/, '').replace(/["\n]/g, '').slice(0, 80) || title;
     housekeepingCost = { model: HOUSEKEEPING.model, costUsd: t.costUsd, inputTokens: t.inputTokens, outputTokens: t.outputTokens };
   } catch (err) {
     warnings.push(`Housekeeping title call failed (cosmetic only): ${err.message}`);
