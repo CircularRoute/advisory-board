@@ -142,6 +142,8 @@
   .roleWrap .hint { margin-top: 4px; }
   /* Role explanations read larger than ordinary hints - they carry a decision. */
   .roleWrap .hint, .seatBlurb { font-size: 15px; color: var(--ink); }
+  /* Prices in session/history rows stand out from the surrounding meta text. */
+  .pr { color: var(--ink); font-weight: 700; }
   .seatBlurb { margin: -3px 0 9px 4px; }
 
   .runlist { list-style: none; margin: 0; padding: 0; }
@@ -452,7 +454,18 @@
 
   // Small stable surface for server-injected page fragments, announced with
   // an event so fragments never depend on load-order timing.
-  window.__board = { apiFetch, esc, md, openReport };
+  // MONTHS must be initialized BEFORE __board is published: the admin fragment's
+  // init runs off the board-ready event and can call fmtDate at the main script's
+  // first await - a hoisted fmtDate with a not-yet-initialized const would throw.
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  // "25 June, 2026" in the viewer's own timezone; withTime appends "14:36".
+  function fmtDate(iso, withTime) {
+    const d = new Date(iso);
+    if (!iso || isNaN(d)) return (iso || '').slice(0, 10);
+    const s = d.getDate() + ' ' + MONTHS[d.getMonth()] + ', ' + d.getFullYear();
+    return withTime ? s + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') : s;
+  }
+  window.__board = { apiFetch, esc, md, openReport, fmtDate };
   window.dispatchEvent(new Event('board-ready'));
 
   let cfg;
@@ -751,10 +764,10 @@
     if (!runs.length) { el.innerHTML = '<li>No sessions yet.</li>'; return; }
     el.innerHTML = runs.map((r) => {
       const q = r.question || r.title || r.dir;
-      const date = (r.at || '').slice(0, 10);
+      const date = fmtDate(r.at);
       return '<li class="sess" data-dir="' + esc(r.dir) + '">' +
         '<div class="sess-head"><span class="sess-q">' + esc(q) + '</span>' +
-        '<span class="sess-meta">' + esc(r.tier) + (r.shortHanded ? ' · short-handed' : '') + (r.costUsd != null ? ' · $' + r.costUsd.toFixed(2) : '') + '<br>' + esc(date) + '</span>' +
+        '<span class="sess-meta">' + esc(r.tier) + (r.shortHanded ? ' · short-handed' : '') + (r.costUsd != null ? ' · <b class="pr">$' + r.costUsd.toFixed(2) + '</b>' : '') + '<br>' + esc(date) + '</span>' +
         '<span class="chev">▾</span></div>' +
         '<div class="sess-body" hidden></div></li>';
     }).join('');

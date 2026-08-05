@@ -232,8 +232,8 @@ const ADMIN_FRAGMENT = `
               var q = h.question.length > 160 ? h.question.slice(0, 160) + '\\u2026' : h.question;
               return '<li class="hrow" data-dir="' + B.esc(h.dir) + '"><span class="q">' + B.esc(q) + '</span>' +
                 '<span class="sub">' + B.esc(h.askedBy || 'unknown') + ' \\u00b7 ' +
-                B.esc((h.at || '').slice(0, 16).replace('T', ' ')) + ' \\u00b7 ' + B.esc(h.tier) +
-                (h.costUsd != null ? ' \\u00b7 $' + h.costUsd.toFixed(2) + (h.outOfPocketUsd ? ' (oop $' + h.outOfPocketUsd.toFixed(2) + ')' : '') : '') +
+                B.esc(B.fmtDate ? B.fmtDate(h.at, true) : (h.at || '').slice(0, 16).replace('T', ' ')) + ' \\u00b7 ' + B.esc(h.tier) +
+                (h.costUsd != null ? ' \\u00b7 <b class="pr">$' + h.costUsd.toFixed(2) + '</b>' + (h.outOfPocketUsd ? ' (oop $' + h.outOfPocketUsd.toFixed(2) + ')' : '') : '') +
                 '</span></li>';
             }).join('');
             el.querySelectorAll('li[data-dir]').forEach(function (li) {
