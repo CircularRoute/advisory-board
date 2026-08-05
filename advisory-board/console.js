@@ -20,7 +20,7 @@ const path = require('node:path');
 
 const { loadKeys, TIERS, DEFAULT_TIER, DEFAULT_PROVIDERS, EXTENDED_SEAT_PROVIDERS } = require('./lib/config');
 const { convene, ROLES } = require('./lib/council');
-const { saveRun, RUNS_DIR } = require('./lib/store');
+const { saveRun, saveInterrupted, RUNS_DIR } = require('./lib/store');
 const auth = require('./lib/auth');
 
 // 4821 locally (not the source project's 4820) so both consoles can run side
@@ -59,15 +59,42 @@ function isSecure(req) {
 
 // ---- single-run state + SSE fanout ----
 let running = false;
+let currentPartial = null; // in-flight board state; persisted if the run dies
 const subscribers = new Set();
+// Every event of the current (or most recent) run is kept and replayed to
+// clients that (re)connect mid-run: phones drop the SSE stream whenever the
+// screen locks, and without replay a rejoining client is blind to everything
+// that already happened - including the final result.
+let eventLog = [];
+const EVENT_LOG_MAX = 2000;
 function broadcast(event) {
+  eventLog.push(event);
+  if (eventLog.length > EVENT_LOG_MAX) eventLog.shift();
   const line = `data: ${JSON.stringify(event)}\n\n`;
   for (const res of subscribers) res.write(line);
 }
 
+// The in-flight board's finished work must survive the process: a deploy
+// restart or crash mid-synthesis would otherwise silently destroy every
+// paid-for opinion and review (this happened; never again).
+function preserveInterrupted(reason) {
+  if (!currentPartial) return null;
+  try {
+    const dir = saveInterrupted(currentPartial);
+    currentPartial = null;
+    console.error(`[interrupted] ${reason}: board work preserved as ${path.basename(dir)}`);
+    return path.basename(dir);
+  } catch (err) {
+    console.error(`[interrupted] FAILED to preserve board work: ${err.message}`);
+    return null;
+  }
+}
+
 async function startRun(opts) {
   running = true;
-  broadcast({ type: 'started', opts: { tier: opts.tier, providers: opts.providers, compare: opts.compare } });
+  currentPartial = null;
+  eventLog = [];
+  broadcast({ type: 'started', opts: { tier: opts.tier, providers: opts.providers, compare: opts.compare, question: opts.question } });
   try {
     const tiers = opts.compare && opts.compare.length ? opts.compare : [opts.tier];
     const results = [];
@@ -82,8 +109,10 @@ async function startRun(opts) {
         keys: loadKeys(),
         log: (m) => broadcast({ type: 'log', tier, line: m }),
         onEvent: (e) => broadcast({ type: 'engine', tier, e }),
+        onPartial: (p) => { p.askedBy = opts.askedBy || null; currentPartial = p; },
       });
       run.askedBy = opts.askedBy || null; // who convened this board (admin history)
+      currentPartial = null; // the run completed; the snapshot is superseded
       const dir = saveRun(run);
       broadcast({ type: 'run-done', tier, dir: path.basename(dir) });
       results.push({ tier, dir: path.basename(dir), run });
@@ -104,7 +133,13 @@ async function startRun(opts) {
       })),
     });
   } catch (err) {
-    broadcast({ type: 'error', message: err.message });
+    const saved = preserveInterrupted('run failed');
+    broadcast({
+      type: 'error',
+      message: err.message + (saved
+        ? ` — the board's completed opinions and reviews were preserved; see "${saved}" in Past sessions.`
+        : ''),
+    });
   } finally {
     running = false;
   }
@@ -218,6 +253,7 @@ function listRuns(limit = 25) {
         members: (r.members || []).map((m) => m.seatName || m.model),
         costUsd: r.cost ? r.cost.totalUsd : null,
         shortHanded: (r.failedMembers || []).length > 0,
+        interrupted: !!r.interrupted,
       });
     } catch { /* skip unreadable run dirs */ }
   }
@@ -444,6 +480,7 @@ ${ok
       connection: 'keep-alive',
     });
     res.write(`data: ${JSON.stringify({ type: 'hello', running })}\n\n`);
+    if (eventLog.length) res.write(`data: ${JSON.stringify({ type: 'replay', events: eventLog })}\n\n`);
     subscribers.add(res);
     const ping = setInterval(() => res.write(': ping\n\n'), 15000);
     req.on('close', () => { clearInterval(ping); subscribers.delete(res); });
@@ -530,6 +567,17 @@ ${ok
 
   json(res, 404, { error: 'not found' });
 });
+
+// Render (like any orderly host) sends SIGTERM before replacing the process
+// on deploy. A board in flight exists only in memory - dump its finished work
+// to the persistent disk as an interrupted record before dying, so a deploy
+// can never again destroy a run in progress.
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.on(sig, () => {
+    preserveInterrupted(`${sig} received (deploy/restart)`);
+    process.exit(0);
+  });
+}
 
 server.listen(PORT, HOST, () => {
   for (const p of auth.configProblems()) console.error(`[auth] WARNING: ${p} - email sign-in disabled`);

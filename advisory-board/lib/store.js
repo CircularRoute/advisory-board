@@ -86,6 +86,49 @@ function saveRun(run) {
   return dir;
 }
 
+// An interrupted run: the process died (deploy restart, crash) or synthesis
+// failed after all retries, BEFORE the chairman delivered a final answer. The
+// paid-for opinions and reviews are preserved verbatim so the work is never
+// lost; the report says loudly that no synthesis exists.
+function renderInterruptedReport(run) {
+  const ops = (run.opinions || [])
+    .map((o) => `### ${o.seatName || o.model}${o.role ? ` (${o.role})` : ''}\n\n${o.text}`)
+    .join('\n\n---\n\n') || '_No opinions were completed._';
+  const revs = (run.reviews || [])
+    .map((r) => `### Review by ${r.reviewer.seatName}\n\n${r.text}`)
+    .join('\n\n---\n\n') || '_The run was interrupted before any peer review finished._';
+  return `# Advisory Board - INTERRUPTED RUN (no final answer)
+
+**This run did not finish.** It stopped at: ${run.phase || 'unknown stage'} - most likely a deploy/restart of the service or a chairman failure. There is NO chairman synthesis; nothing below is a final answer. Everything the board completed before the interruption is preserved verbatim, so re-convening the question costs only what was still missing.
+
+**Tier: ${run.tier.toUpperCase()}${run.mixedTier ? ' (mixed-tier board)' : ''}** | Board: ${(run.members || []).map((m) => m.seatName || m.model).join(' + ')}
+**Cost so far: ${fmtUsd(run.cost.totalUsd)}** (prepaid ${fmtUsd(run.cost.prepaidUsd)}, out-of-pocket ${fmtUsd(run.cost.outOfPocketUsd)})${(run.failedMembers || []).length ? `\n**RAN SHORT-HANDED** - failed members: ${run.failedMembers.map((m) => m.seatName || m.model).join(', ')}` : ''}
+
+## Question
+
+${run.question}
+
+## Member opinions (verbatim - no synthesis was produced)
+
+${ops}
+
+## Blind peer reviews
+
+${revs}
+
+${run.warnings && run.warnings.length ? `## Warnings\n\n${run.warnings.map((w) => `- ${w}`).join('\n')}\n` : ''}`;
+}
+
+function saveInterrupted(run) {
+  const dir = path.join(RUNS_DIR, `${stamp()}-interrupted-${slugify(run.question || 'run').slice(0, 30)}`);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, 'run.json'), JSON.stringify(run, null, 2));
+  writeFileSync(path.join(dir, 'report.md'), renderInterruptedReport(run));
+  // Deliberately NOT appended to leaderboard.jsonl - an unfinished run has no
+  // standing in the aggregate dataset.
+  return dir;
+}
+
 function saveComparison(comparison) {
   const dir = path.join(RUNS_DIR, 'comparisons');
   mkdirSync(dir, { recursive: true });
@@ -94,4 +137,4 @@ function saveComparison(comparison) {
   return file;
 }
 
-module.exports = { saveRun, saveComparison, renderReport, fmtUsd, RUNS_DIR };
+module.exports = { saveRun, saveInterrupted, saveComparison, renderReport, fmtUsd, RUNS_DIR };

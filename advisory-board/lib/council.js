@@ -241,7 +241,7 @@ function resolveMember(spec, boardTier) {
   );
 }
 
-async function convene({ question, tier, providers, extras = [], baseRoles = [], chairmanOverride, keys, log = () => {}, onEvent = () => {} }) {
+async function convene({ question, tier, providers, extras = [], baseRoles = [], chairmanOverride, keys, log = () => {}, onEvent = () => {}, onPartial = () => {} }) {
   if (!TIERS[tier]) throw new Error(`Unknown tier: ${tier}`);
   const emit = (t, data) => { try { onEvent({ t, ...(data || {}) }); } catch { /* events are best-effort */ } };
   // Base seats are objective by default but may optionally carry a role
@@ -313,8 +313,35 @@ async function convene({ question, tier, providers, extras = [], baseRoles = [],
     throw new Error(`All board members failed:\n${warnings.join('\n')}`);
   }
 
-  // Stage 2 - blind peer review (skipped if only one member survived).
   let reviews = [];
+  // Snapshot of everything completed so far, in the same shape as the final
+  // run record. Handed to onPartial after each stage so the caller can persist
+  // it - a crashed or killed process (e.g. a deploy restart mid-synthesis)
+  // must never silently destroy finished, paid-for board work.
+  const partialRecord = (phase, extra = {}) => ({
+    interrupted: true,
+    phase,
+    title: `INTERRUPTED - ${question.slice(0, 50)}`,
+    question,
+    tier,
+    mixedTier,
+    members: members.map((m) => ({ seat: m.seat, seatName: m.seatName, role: m.role ? ROLES[m.role].name : null, provider: m.provider, model: m.model, memberTier: m.memberTier })),
+    failedMembers: roster
+      .filter((r) => !members.some((m) => m.seat === r.seat))
+      .map((r) => ({ seat: r.seat, seatName: r.seatName, provider: r.provider, model: r.model })),
+    chairman: { provider: chairman.provider, model: chairman.model, source: chairman.source, isSittingMember: chairmanIsSitting },
+    opinions: members.map((m) => ({ seat: m.seat, seatName: m.seatName, role: m.role ? ROLES[m.role].name : null, provider: m.provider, model: m.model, text: m.opinion })),
+    reviews,
+    leaderboard: extra.leaderboard || null,
+    finalAnswer: null,
+    cost: summarizeCost(ledger),
+    warnings,
+    ledger: ledger.calls,
+    finishedAt: new Date().toISOString(),
+  });
+  try { onPartial(partialRecord('opinions finished; interrupted before/during peer review')); } catch { /* persistence is best-effort */ }
+
+  // Stage 2 - blind peer review (skipped if only one member survived).
   if (members.length >= 2) {
     emit('stage', { n: 2 });
     log(`stage 2: blind peer review (${members.length} reviewers, labels shuffled per reviewer)...`);
@@ -406,6 +433,11 @@ async function convene({ question, tier, providers, extras = [], baseRoles = [],
       ? 'normal'
       : 'LOW - with fewer than 3 members this is only "who did the other one prefer", not a finding';
   emit('consensus', { leaderboard, confidence: leaderboardConfidence });
+  try {
+    onPartial(partialRecord('reviews finished; interrupted during chairman synthesis', {
+      leaderboard: { entries: leaderboard, confidence: leaderboardConfidence },
+    }));
+  } catch { /* persistence is best-effort */ }
 
   // Stage 3 - Chairman synthesis, anonymized for the Chairman too.
   emit('stage', { n: 3 });

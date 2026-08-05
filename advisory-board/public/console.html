@@ -732,7 +732,7 @@
       const date = (r.at || '').slice(0, 10);
       return '<li class="sess" data-dir="' + esc(r.dir) + '">' +
         '<div class="sess-head"><span class="sess-q">' + esc(q) + '</span>' +
-        '<span class="sess-meta">' + esc(r.tier) + (r.shortHanded ? ' · short-handed' : '') + (r.costUsd != null ? ' · $' + r.costUsd.toFixed(2) : '') + '<br>' + esc(date) + '</span>' +
+        '<span class="sess-meta">' + (r.interrupted ? '<span class="flag">INTERRUPTED</span> · ' : '') + esc(r.tier) + (r.shortHanded ? ' · short-handed' : '') + (r.costUsd != null ? ' · $' + r.costUsd.toFixed(2) : '') + '<br>' + esc(date) + '</span>' +
         '<span class="chev">▾</span></div>' +
         '<div class="sess-body" hidden></div></li>';
     }).join('');
@@ -970,26 +970,52 @@
 
   // ---------- live events ----------
   const es = new EventSource('/api/events' + (KEY ? '?key=' + encodeURIComponent(KEY) : ''));
-  es.onmessage = (ev) => {
-    const e = JSON.parse(ev.data);
+  function handleEvent(e) {
     if (e.type === 'hello') {
       state.running = e.running;
       if (e.running && $('session').hidden) {
         openSession('(a board is already in session - attaching to the live feed)');
-        feed('rejoined mid-session; showing events from now on');
+      }
+      // The session screen is showing but the server says nothing is running:
+      // if the replay that follows this hello doesn't repopulate the screen
+      // (a restarted server has no events to replay), the run was interrupted
+      // - without this the screen shows "synthesising…" forever.
+      if (!e.running && !$('session').hidden && !$('sResults').innerHTML) {
+        setTimeout(() => {
+          if (!state.running && !$('session').hidden && !$('sResults').innerHTML) {
+            feed('⚠ the server reports no board in session - this run was interrupted (most likely a deploy/restart). Check Past sessions: the board\'s completed work is preserved there as an INTERRUPTED record.');
+            $('backBtn').hidden = false;
+            refreshRuns();
+          }
+        }, 2500);
       }
       render();
       return;
     }
+    if (e.type === 'replay') {
+      // Everything that happened before we (re)connected. Rebuild the live
+      // view only when it matters: a run is in progress, or this page is
+      // still showing a session screen it never saw finish.
+      const stuck = !$('session').hidden && !$('sResults').innerHTML;
+      if (!state.running && !stuck) return;
+      if ($('session').hidden) openSession('(rejoining the board in session)');
+      else $('sFeed').textContent = '';
+      for (const ev of e.events || []) handleEvent(ev);
+      return;
+    }
     if (e.type === 'engine') { engineEvent(e.tier, e.e); return; }
-    if (e.type === 'started') { if ($('session').hidden) openSession('(board convened elsewhere - live feed)'); feed('board convened (' + (e.opts.compare && e.opts.compare.length ? 'Calibrate: ' + e.opts.compare.join(', ') : 'tier: ' + e.opts.tier) + ')'); }
+    if (e.type === 'started') {
+      if ($('session').hidden) openSession('(board convened elsewhere - live feed)');
+      if (e.opts && e.opts.question) $('sQuestion').textContent = e.opts.question;
+      feed('board convened (' + (e.opts.compare && e.opts.compare.length ? 'Calibrate: ' + e.opts.compare.join(', ') : 'tier: ' + e.opts.tier) + ')');
+    }
     if (e.type === 'log') feed('· ' + e.line);
     if (e.type === 'run-done') feed('record saved: ' + e.dir);
     if (e.type === 'error') {
       feed('⚠ ERROR: ' + e.message);
       $('sResults').innerHTML = '<div class="banner err">' + esc(e.message) + '</div>';
       $('backBtn').hidden = false;
-      state.running = false; render();
+      state.running = false; render(); refreshRuns();
     }
     if (e.type === 'done') {
       setStep(4);
@@ -998,7 +1024,8 @@
       state.running = false;
       render(); refreshRuns();
     }
-  };
+  }
+  es.onmessage = (ev) => handleEvent(JSON.parse(ev.data));
 
   // URL prefill, so an agent can hand a configured board to the human whose
   // tap on Convene is the spend approval:
