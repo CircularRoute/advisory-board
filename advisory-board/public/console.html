@@ -133,6 +133,10 @@
   .ans-h.split { background: var(--warn-bg); color: var(--warn-ink); }
   .ans-h.resolve { background: #EAF1FB; color: #33538C; }
   .ans-h.warnh { background: var(--err-bg); color: var(--err-ink); }
+  #sizeSeg { display: flex; flex-direction: column; align-items: stretch; width: 100%; gap: 4px; }
+  #sizeSeg button { text-align: left; padding: 12px 14px; }
+  .card.qcard { border: 2px solid var(--accent); box-shadow: 0 10px 32px rgba(30,130,76,0.16); }
+  .card.qcard h2 { color: var(--accent); }
   .roleWrap { margin-top: 9px; }
   .roleWrap .hint { margin-top: 4px; }
   .seatBlurb { margin: -3px 0 9px 4px; }
@@ -298,7 +302,7 @@
         <div id="estimate"></div>
       </div>
 
-      <div class="card">
+      <div class="card qcard">
         <h2>The question</h2>
         <textarea id="q" aria-label="The question" placeholder="A hard, decision-shaped question. Give context: what the company is, the constraint, what a useful answer decides. Type it or press Dictate."></textarea>
         <button type="button" id="micBtn" class="micbtn" title="Dictate with the microphone - transcribed by OpenAI (about half a cent per minute)">&#127908; Dictate the question</button>
@@ -482,7 +486,7 @@
     chair: 'default',
     compare: '',
     size: 3,
-    extRoles: ['contrarian', 'executor', 'outsider', 'expansionist'],
+    extRoles: [null, null, null, null],
     running: cfg.running,
   };
 
@@ -539,7 +543,7 @@
     return provs.map((p, i) => ({
       provider: p, memberTier: tier, model: TIERS[tier][p].model,
       inPerM: TIERS[tier][p].inPerM, outPerM: TIERS[tier][p].outPerM,
-      role: state.extRoles[i],
+      role: state.extRoles[i], extra: true,
     }));
   }
   function fullRoster(tier) { return baseRoster(tier).concat(extraSeats(tier)); }
@@ -617,13 +621,15 @@
     } else {
       const provs = EXT_SEATS[state.size - 3] || [];
       rf.innerHTML = provs.map((p, i) => {
-        const blurb = (ROLE_LIST.find((r) => r.key === state.extRoles[i]) || {}).blurb || '';
+        const chosen = ROLE_LIST.find((r) => r.key === state.extRoles[i]);
+        const blurb = chosen ? chosen.blurb : 'Pick a role to see what this seat will do.';
         return '<div class="roleWrap"><div class="roleRow"><span class="rl"><span class="dot" style="background:' + PCOLOR[p] + ';display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px"></span>' + PLABEL[p] + ' · ' + esc(TIERS[state.tier][p].model) + '</span>' +
         '<select data-idx="' + i + '" aria-label="Role for extra ' + PLABEL[p] + ' seat">' +
+        '<option value=""' + (!state.extRoles[i] ? ' selected' : '') + '>Select a role…</option>' +
         ROLE_LIST.map((r) => '<option value="' + r.key + '"' + (state.extRoles[i] === r.key ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('') +
         '</select></div><div class="hint">' + esc(blurb) + '</div></div>';
       }).join('');
-      rf.querySelectorAll('select').forEach((el) => el.addEventListener('change', (e) => { state.extRoles[+e.target.dataset.idx] = e.target.value; render(); }));
+      rf.querySelectorAll('select').forEach((el) => el.addEventListener('change', (e) => { state.extRoles[+e.target.dataset.idx] = e.target.value || null; render(); }));
     }
 
     const prevChair = state.chair;
@@ -639,12 +645,14 @@
     let blocked = null;
     if (base.length < 2) blocked = 'A board needs at least two seated providers.';
     if (state.size === 7 && !state.seats.google.on) blocked = 'The full bench includes a second Gemini seat - turn the Gemini seat on for a 7-member board.';
+    if (!blocked && state.size > 3 && state.extRoles.slice(0, state.size - 3).some((r) => !r)) blocked = 'Assign a role to every extended seat before convening.';
     const ros = fullRoster(state.tier);
     for (const m of ros) {
       const off = m.memberTier !== state.tier;
+      const chip = m.role ? esc(roleName(m.role)) : (m.extra ? 'choose a role' : 'Objective');
       view.innerHTML += '<div class="member-chip"><span class="dot" style="background:' + PCOLOR[m.provider] + '"></span>' + m.model +
-        (m.role ? ' <span class="rolechip">' + esc(roleName(m.role)) + '</span>' : '') +
-        '<span class="tiertag' + (off ? ' offtier' : '') + '">' + (m.role ? '' : 'objective · ') + m.memberTier + (off ? ' seat on a ' + state.tier + ' board' : '-tier') + '</span></div>';
+        ' <span class="rolechip">' + chip + '</span>' +
+        '<span class="tiertag' + (off ? ' offtier' : '') + '">' + m.memberTier + (off ? ' seat on a ' + state.tier + ' board' : '-tier') + '</span></div>';
     }
     const chair = resolveChair(state.tier, ros);
     view.innerHTML += '<div class="member-chip chair-chip"><span class="dot" style="background:' + PCOLOR[chair.provider] + '"></span>' + chair.model + '<span class="tiertag">chairman - ' + chair.source + '</span></div>';
@@ -656,14 +664,13 @@
       '<div class="stat-row"><span class="k">Board</span><span class="v">' + ros.length + ' members' + (tiersToRun.length > 1 ? ' × ' + tiersToRun.length + ' tiers' : '') + '</span></div>' +
       '<div class="stat-row"><span class="k">Prepaid credit (Anthropic + OpenAI)</span><span class="v">' + fmt(prepaid) + '</span></div>' +
       '<div class="stat-row"><span class="k">Out-of-pocket (Gemini)</span><span class="v' + (oop > 0 ? ' oop' : '') + '">' + fmt(oop) + '</span></div>' +
-      '<div class="stat-row total"><span class="k">Total, roughly</span><span class="v">' + fmt(prepaid + oop) + '</span></div>' +
+      '<div class="stat-row total"><span class="k">TOTAL COST</span><span class="v">' + fmt(prepaid + oop) + '</span></div>' +
       '<div class="hint">Rough estimate only; the real cost is printed with the answer.</div>';
 
     if (blocked) bannersEl.innerHTML += '<div class="banner err">' + esc(blocked) + '</div>';
-    if (!blocked && state.seats.google.on) bannersEl.innerHTML += '<div class="banner warn">Gemini is seated: its share spends real money (Anthropic and OpenAI draw prepaid credit).</div>';
     if (chair.sitting) bannersEl.innerHTML += '<div class="banner warn">This chairman sits on the board - a known bias risk. The record will flag it.</div>';
     runBtn.disabled = state.running || !!blocked;
-    runBtn.textContent = state.running ? 'Board in session...' : (tiersToRun.length > 1 ? 'Convene at ' + tiersToRun.length + ' tiers' : 'Convene the board');
+    runBtn.textContent = state.running ? 'Board in session...' : (tiersToRun.length > 1 ? 'Convene Board Meetings · ' + tiersToRun.length + ' tiers' : 'Convene Board Meeting');
   }
 
   $('tierSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { state.tier = b.dataset.tier; render(); } });
