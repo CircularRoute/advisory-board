@@ -86,8 +86,11 @@ const HOUSEKEEPING = { provider: 'anthropic', model: 'claude-haiku-4-5', inPerM:
 // Anthropic and OpenAI draw on prepaid credit; Google is out-of-pocket.
 const PREPAID_PROVIDERS = new Set(['anthropic', 'openai']);
 
-// Gemini OFF by default (founder decision 2026-08-05): prepaid-credit board only.
-const DEFAULT_PROVIDERS = ['anthropic', 'openai'];
+// Default board: all three vendors, with the Gemini seat pinned to MID tier
+// (owner decision 2026-08-05: Gemini in by default; toggle it off when not
+// wanted). Google still spends out-of-pocket money and every run's output
+// flags that share.
+const DEFAULT_PROVIDERS = ['anthropic', 'openai', 'google:mid'];
 const DEFAULT_TIER = 'mid';
 
 // Chairman default: an Anthropic model from a DIFFERENT tier than the board, so

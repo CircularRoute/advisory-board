@@ -54,7 +54,7 @@ The console ships a web-app manifest and icons: open the site in the phone brows
 | mid (default) | gpt-5.6-terra ($2.50/$15) | claude-opus-5 ($5/$25) | gemini-3.6-flash ($1.50/$7.50) |
 | low | gpt-5.6-luna ($1/$6) | claude-sonnet-5 ($2/$10 intro to 2026-08-31, then $3/$15) | gemini-3.5-flash-lite ($0.30/$2.50) |
 
-All IDs verified against each provider's live models endpoint on 2026-08-05. Gemini pro-class only exists as a preview ID. **Gemini is OFF by default** - Anthropic and OpenAI draw prepaid credit; Google spends real money, so it is an explicit opt-in and the output flags the out-of-pocket portion.
+All IDs verified against each provider's live models endpoint on 2026-08-05. Gemini pro-class only exists as a preview ID. **The default board seats all three vendors, with the Gemini seat pinned to mid tier** (`--providers=anthropic,openai,google:mid`). Anthropic and OpenAI draw prepaid credit; the Google seat spends real money - every run's output flags that out-of-pocket share, and the seat is one toggle (or `--providers=anthropic,openai`) to drop. A three-member board also makes the blind-ranking leaderboard meaningful (with two members it is degenerate).
 
 ## The mechanism
 

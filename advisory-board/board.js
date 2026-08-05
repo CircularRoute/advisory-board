@@ -127,8 +127,9 @@ async function main() {
   if (opts.help || !opts.question) {
     console.log(`Usage: node board.js [--tier=top|mid|low] [--providers=...] [--chairman=provider:model] [--compare=tier1,tier2[,tier3]] "the question"
 
-Defaults: --tier=mid --providers=anthropic,openai (Gemini is opt-in: it spends
-out-of-pocket money; Anthropic and OpenAI draw prepaid credit).
+Defaults: --tier=mid --providers=anthropic,openai,google:mid (the Gemini seat
+is pinned to mid tier and spends out-of-pocket money; drop it with
+--providers=anthropic,openai. Anthropic and OpenAI draw prepaid credit).
 
 A provider entry may pin its member to another tier or an exact model
 (mixed-tier board), e.g. a top board with a cheaper Gemini seat:

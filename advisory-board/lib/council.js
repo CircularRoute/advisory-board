@@ -371,7 +371,7 @@ async function convene({ question, tier, providers, chairmanOverride, keys, log 
   const cost = summarizeCost(ledger);
   if (roster.some((m) => m.provider === 'google')) {
     warnings.push(
-      `Gemini was opted IN: $${cost.byProvider.google ? cost.byProvider.google.toFixed(4) : '0'} of this run was OUT-OF-POCKET (every other provider draws prepaid credit).`
+      `Gemini seat: $${cost.byProvider.google ? cost.byProvider.google.toFixed(4) : '0'} of this run was OUT-OF-POCKET (Anthropic and OpenAI draw prepaid credit). Toggle the Google seat off to avoid it.`
     );
   }
 
