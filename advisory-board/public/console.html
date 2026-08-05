@@ -65,6 +65,14 @@
   .hint { font-size: 13px; color: var(--ink-soft); margin-top: 8px; line-height: 1.55; }
 
   .seg { display: inline-flex; flex-wrap: wrap; background: var(--tint); border-radius: 11px; padding: 3px; gap: 2px; }
+  .segrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .ghostbtn { font: 600 15px var(--sans); color: var(--accent); background: #fff; border: 2px solid var(--accent); border-radius: 999px; padding: 8px 20px; cursor: pointer; }
+  .ghostbtn:hover { background: rgba(30,130,76,.06); }
+  .rolebook h3 { font: 700 17px var(--sans); margin: 0 0 4px; }
+  .rolebook p { font-size: 15px; color: var(--ink-soft); line-height: 1.55; margin: 0; }
+  .rolebook li { list-style: none; padding: 14px 0; border-top: 1px solid var(--line); }
+  .rolebook li:first-child { border-top: none; }
+  .rolebook ul { margin: 0; padding: 0; }
   .seg button { border: 0; background: transparent; color: var(--ink); font: 600 14px var(--sans); padding: 8px 18px; border-radius: 8px; cursor: pointer; transition: background .15s, box-shadow .15s; }
   .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; box-shadow: var(--shadow-pill); }
   button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -279,7 +287,10 @@
         <h2>Configuration</h2>
         <div class="field">
           <span class="lab" id="tierlab">Board tier</span>
-          <div class="seg" role="group" aria-labelledby="tierlab" id="tierSeg"></div>
+          <div class="segrow">
+            <div class="seg" role="group" aria-labelledby="tierlab" id="tierSeg"></div>
+            <button type="button" class="ghostbtn" id="rolesBtn">Roles</button>
+          </div>
           <div class="hint">Default to mid; use Calibrate below to learn where top actually changes the answer for your questions.</div>
         </div>
         <div class="field">
@@ -393,6 +404,15 @@
 <dialog id="reportDlg">
   <button class="close" id="dlgClose">Close</button>
   <div class="answer" id="reportBody"></div>
+</dialog>
+
+<dialog id="rolesDlg">
+  <button class="close" id="rolesClose">Close</button>
+  <div class="rolebook">
+    <h2>Board roles</h2>
+    <p class="hint">A seat with no role answers the question straight. Assign a role and that member argues the question from one deliberate perspective - the board hears every angle, and the chairman is told which roles sat without knowing which answer came from whom.</p>
+    <ul id="rolesBook"></ul>
+  </div>
 </dialog>
 
 <script>
@@ -800,6 +820,14 @@
     $('reportDlg').showModal();
   }
   $('dlgClose').addEventListener('click', () => $('reportDlg').close());
+
+  // ---------- the role book: every role in one place ----------
+  $('rolesBtn').addEventListener('click', () => {
+    $('rolesBook').innerHTML = ROLE_LIST.map((r) =>
+      '<li><h3>' + esc(r.name) + '</h3><p>' + esc(r.blurb) + '</p></li>').join('');
+    $('rolesDlg').showModal();
+  });
+  $('rolesClose').addEventListener('click', () => $('rolesDlg').close());
 
   // ---------- voice input ----------
   const micBtn = $('micBtn');
