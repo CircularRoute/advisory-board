@@ -13,9 +13,11 @@ const ENV_PATH =
   process.env.ADVISORY_BOARD_ENV_FILE ||
   '/Users/rashadabbasov/Desktop/Claude Playground/greenlight.env';
 
-function loadKeys() {
+let envFileCache;
+function readEnvFile() {
+  if (envFileCache) return envFileCache;
   const file = {};
-  let fileErr = null;
+  let err = null;
   try {
     const raw = readFileSync(ENV_PATH, 'utf8');
     for (const line of raw.split('\n')) {
@@ -25,9 +27,20 @@ function loadKeys() {
       if (i === -1) continue;
       file[trimmed.slice(0, i).trim()] = trimmed.slice(i + 1).trim();
     }
-  } catch (err) {
-    fileErr = err;
+  } catch (e) {
+    err = e;
   }
+  envFileCache = { file, err };
+  return envFileCache;
+}
+
+// Generic secret lookup: process env first (hosted), env file second (local).
+function envSecret(name) {
+  return process.env[name] || readEnvFile().file[name] || null;
+}
+
+function loadKeys() {
+  const { file, err: fileErr } = readEnvFile();
   const keys = {
     anthropic: process.env.ANTHROPIC_API_KEY || file.ANTHROPIC_API_KEY || null,
     openai: process.env.OPENAI_API_KEY || file.OPENAI_API_KEY || null,
@@ -130,6 +143,7 @@ function resolveChairman(tier, roster, override) {
 
 module.exports = {
   ENV_PATH,
+  envSecret,
   loadKeys,
   TIERS,
   HOUSEKEEPING,

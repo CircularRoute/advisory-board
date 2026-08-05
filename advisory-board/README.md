@@ -31,10 +31,16 @@ A web console over the same engine: pick tier and seats (including mixed-tier pi
 
 The question can be typed or dictated: the **Dictate** button records with the browser microphone and transcribes server-side through OpenAI's audio API (`/api/transcribe`, key-gated like every spending endpoint; ~half a cent per minute, 2-minute cap). Microphone access needs a secure context - https (Render) or localhost.
 
-Two modes, decided by `BOARD_ACCESS_KEY`:
+Two modes, decided by whether any auth is configured:
 
-- **Local (no key, the default):** binds to 127.0.0.1 only, no auth - runs spend API credit, so the loopback bind is the gate. Port 4821, so it can run alongside the source project's console on 4820. In Claude desktop it opens via the `advisory-board-console` entry in `.claude/launch.json`.
-- **Hosted (key set):** binds 0.0.0.0 and every `/api/*` endpoint requires the key (`Authorization: Bearer`, or `?key=` for the SSE stream). The page prompts for the key once and remembers it per browser. A public bind without a key is impossible by construction.
+- **Local (no auth configured, the default):** binds to 127.0.0.1 only, no auth - runs spend API credit, so the loopback bind is the gate. Port 4821, so it can run alongside the source project's console on 4820. In Claude desktop it opens via the `advisory-board-console` entry in `.claude/launch.json`.
+- **Hosted:** binds 0.0.0.0 and every `/api/*` endpoint requires auth. A public bind without auth is impossible by construction. Two mechanisms, either or both:
+  - **Magic-link email sign-in (primary):** set `BOARD_ALLOWED_EMAILS` (comma-separated allowlist) plus `BREVO_API_KEY` and `BREVO_SENDER_EMAIL` (or `BOARD_MAGIC_FROM`). The console shows an email form; authorized addresses receive a single-use link (15 min TTL, sent via Brevo's HTTP API) and the open page **polls and signs itself in when the link is tapped anywhere** - required for the installed PWA on iOS, whose cookie jar is separate from Safari's. Sessions last 90 days and persist on disk across redeploys. Unknown addresses get the same generic response (no allowlist enumeration); link requests are rate-limited.
+  - **Access key (fallback / scripts):** `BOARD_ACCESS_KEY` via `Authorization: Bearer` or `?key=`.
+
+### Install on a phone (PWA)
+
+The console ships a web-app manifest and icons: open the site in the phone browser, then **Add to Home Screen** (iOS Safari: Share → Add to Home Screen; Android Chrome: menu → Add to Home screen / Install). It opens standalone under its own icon, no URL typing. Anyone whose email is on `BOARD_ALLOWED_EMAILS` can install it on their own phone and sign in the same way.
 
 ## Hosting on Render
 

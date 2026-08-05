@@ -1,6 +1,7 @@
 node_modules/
 sittings/
 advisory-board/runs/
+advisory-board/board-sessions.json
 leaderboard.json
 verification-run.log
 .env

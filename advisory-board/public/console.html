@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Advisory Board Console</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1E824C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Board">
 <style>
   :root {
     --ground: #F6F8F5; --panel: #FFFFFF; --panel-2: #EEF2EC;
@@ -110,6 +117,18 @@
   th, td { text-align: left; padding: 7px 11px; border-bottom: 1px solid var(--line); white-space: nowrap; }
   th { font-family: var(--head); font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
   td.mono { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+  #loginOverlay { position: fixed; inset: 0; background: var(--ground); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+  #loginOverlay[hidden] { display: none; }
+  .login-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 26px 24px; max-width: 400px; width: 100%; }
+  .login-card h2 { font-family: var(--head); margin: 0 0 6px; font-size: 18px; }
+  .login-card .sub { color: var(--ink-soft); font-size: 14px; margin: 0 0 14px; }
+  .login-card input { width: 100%; font-size: 16px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink); box-sizing: border-box; margin-bottom: 10px; font-family: inherit; }
+  .login-card button { width: 100%; padding: 12px; font-family: var(--head); font-size: 15px; font-weight: 600; background: var(--accent); color: var(--accent-ink); border: none; border-radius: 8px; cursor: pointer; }
+  .login-card button[disabled] { opacity: 0.5; }
+  .login-card details { margin-top: 14px; font-size: 13px; color: var(--ink-soft); }
+  #loginMsg { font-size: 13px; margin-top: 10px; color: var(--ink-soft); }
+  .masthead .who { margin-left: auto; font-family: var(--mono); font-size: 11.5px; color: var(--ink-soft); }
+  .masthead .who a { color: var(--accent); }
 
   /* Phone layout: this console is used mostly from mobile. Form controls get
      16px fonts (anything smaller makes iOS Safari zoom the page on focus),
@@ -205,6 +224,25 @@
   </div>
 </div>
 
+<div id="loginOverlay" hidden>
+  <div class="login-card">
+    <h2>Advisory Board</h2>
+    <p class="sub">Sign in with an authorized email. You'll get a magic link - this page signs itself in when you tap it, so it works from the installed app too.</p>
+    <form id="loginForm">
+      <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email" required>
+      <button type="submit" id="loginSend">Email me a sign-in link</button>
+    </form>
+    <p id="loginMsg"></p>
+    <details>
+      <summary>Use an access key instead</summary>
+      <form id="keyForm">
+        <input type="password" id="keyInput" placeholder="access key" autocomplete="off">
+        <button type="submit">Save key</button>
+      </form>
+    </details>
+  </div>
+</div>
+
 <dialog id="reportDlg">
   <button class="close" id="dlgClose">Close</button>
   <div class="answer" id="reportBody"></div>
@@ -214,22 +252,83 @@
 (async function () {
   const $ = (id) => document.getElementById(id);
 
-  // Hosted mode: every /api call carries the access key; a 401 prompts once
-  // and remembers the key locally. In local mode no key exists and this is a
-  // pass-through.
+  // Hosted mode auth: a session cookie set via magic link rides along
+  // automatically; a stored access key (fallback) goes in a Bearer header.
+  // Any 401 shows the sign-in overlay. Local mode: pass-through.
   let KEY = localStorage.getItem('board_key') || '';
+  const overlay = $('loginOverlay');
+  function showLogin() { overlay.hidden = false; }
   async function apiFetch(url, opts = {}) {
     const headers = Object.assign({}, opts.headers || {}, KEY ? { authorization: 'Bearer ' + KEY } : {});
     const r = await fetch(url, Object.assign({}, opts, { headers }));
     if (r.status === 401) {
-      const k = window.prompt('This console is key-protected. Enter the access key:');
-      if (k && k.trim()) { KEY = k.trim(); localStorage.setItem('board_key', KEY); return apiFetch(url, opts); }
-      throw new Error('unauthorized');
+      showLogin();
+      const err = new Error('unauthorized');
+      err.authRequired = true;
+      throw err;
     }
     return r;
   }
 
-  const cfg = await (await apiFetch('/api/config')).json();
+  // Magic-link sign-in: request a link, then poll until it is tapped
+  // anywhere (mail app, Safari). The poll response sets THIS context's
+  // cookie - required for the installed PWA, whose cookie jar is separate
+  // from the browser the email link opens in.
+  let pollTimer = null;
+  $('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = $('loginEmail').value.trim();
+    if (!email) return;
+    $('loginSend').disabled = true;
+    try {
+      const r = await fetch('/auth/request', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'request failed');
+      $('loginMsg').textContent = d.message;
+      clearInterval(pollTimer);
+      const pollStart = Date.now();
+      pollTimer = setInterval(async () => {
+        if (Date.now() - pollStart > 16 * 60 * 1000) { clearInterval(pollTimer); return; }
+        try {
+          const p = await (await fetch('/auth/poll?rid=' + encodeURIComponent(d.requestId))).json();
+          if (p.status === 'approved') { clearInterval(pollTimer); location.reload(); }
+        } catch { /* transient network error - keep polling */ }
+      }, 3000);
+    } catch (err) {
+      $('loginMsg').textContent = 'Error: ' + err.message;
+    }
+    $('loginSend').disabled = false;
+  });
+  $('keyForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const k = $('keyInput').value.trim();
+    if (!k) return;
+    localStorage.setItem('board_key', k);
+    location.reload();
+  });
+
+  let cfg;
+  try {
+    cfg = await (await apiFetch('/api/config')).json();
+  } catch (err) {
+    if (err && err.authRequired) return; // overlay is showing; page loads fresh after sign-in
+    throw err;
+  }
+
+  // Signed-in indicator (magic-link sessions only)
+  fetch('/auth/me').then((r) => r.json()).then((me) => {
+    if (me.email) {
+      const el = document.createElement('span');
+      el.className = 'who';
+      el.innerHTML = esc(me.email) + ' · <a href="#" id="signout">sign out</a>';
+      document.querySelector('.masthead').appendChild(el);
+      document.getElementById('signout').addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        await fetch('/auth/logout', { method: 'POST' });
+        location.reload();
+      });
+    }
+  }).catch(() => {});
   const TIERS = cfg.tiers;
   const TIER_NAMES = Object.keys(TIERS);
   const CHAIR_DEFAULT = { top: 'mid', mid: 'top', low: 'mid' };

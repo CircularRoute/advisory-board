@@ -29,6 +29,15 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      # Magic-link email sign-in: comma-separated allowlist + Brevo credentials.
+      # Anyone on the list can sign in from any device (and install the PWA);
+      # edit the list here to authorize or remove people.
+      - key: BOARD_ALLOWED_EMAILS
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER_EMAIL
+        sync: false
       - key: BOARD_RUNS_DIR
         value: /var/data/runs
     disk:

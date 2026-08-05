@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 // Web console for the Advisory Board - the cockpit on top of the CLI.
 //
-// Two modes, decided by whether BOARD_ACCESS_KEY is set:
-//   - Local (no key):  binds 127.0.0.1 ONLY, no auth. Same as always.
+// Two modes, decided by whether any auth is configured:
+//   - Local (no auth configured): binds 127.0.0.1 ONLY, no auth. Same as always.
 //       node console.js          ->  http://127.0.0.1:4821
-//   - Hosted (key set): binds 0.0.0.0 and EVERY /api/* endpoint requires the
-//       key (Authorization: Bearer, or ?key= for EventSource). Runs spend API
-//       credit, so a public bind without a key is impossible by construction.
+//   - Hosted (BOARD_ACCESS_KEY and/or magic-link email auth configured):
+//       binds 0.0.0.0 and EVERY /api/* endpoint requires either a signed-in
+//       session cookie (magic link, see lib/auth.js) or the access key
+//       (Authorization: Bearer / ?key=). Runs spend API credit, so a public
+//       bind without auth is impossible by construction.
 //
 // Advisory only, same as the CLI: convenes boards, persists records, never
 // writes to any other system.
@@ -19,21 +21,40 @@ const path = require('node:path');
 const { loadKeys, TIERS, DEFAULT_TIER, DEFAULT_PROVIDERS } = require('./lib/config');
 const { convene } = require('./lib/council');
 const { saveRun, RUNS_DIR } = require('./lib/store');
+const auth = require('./lib/auth');
 
 // 4821 locally (not the source project's 4820) so both consoles can run side
 // by side; hosted platforms (Render) inject PORT.
 const PORT = Number(process.env.PORT || process.env.BOARD_CONSOLE_PORT || 4821);
 const ACCESS_KEY = process.env.BOARD_ACCESS_KEY || null;
-const HOST = ACCESS_KEY ? '0.0.0.0' : '127.0.0.1';
+const MAGIC = auth.isEnabled();
+const HOSTED = !!(ACCESS_KEY || MAGIC);
+const HOST = HOSTED ? '0.0.0.0' : '127.0.0.1';
 
 function authed(req, u) {
-  if (!ACCESS_KEY) return true; // local mode: loopback-only bind is the gate
+  if (!HOSTED) return true; // local mode: loopback-only bind is the gate
+  if (MAGIC && auth.sessionEmail(req.headers.cookie)) return true;
+  if (!ACCESS_KEY) return false;
   const header = req.headers.authorization || '';
   const candidate = header.startsWith('Bearer ') ? header.slice(7) : u.searchParams.get('key');
   if (!candidate) return false;
   const ha = crypto.createHash('sha256').update(candidate).digest();
   const hb = crypto.createHash('sha256').update(ACCESS_KEY).digest();
   return crypto.timingSafeEqual(ha, hb);
+}
+
+// Public base URL for building sign-in links: explicit env, Render's own env
+// var, or derived from the request (proxy-aware).
+function baseUrlFor(req) {
+  if (process.env.BOARD_BASE_URL) return process.env.BOARD_BASE_URL.replace(/\/$/, '');
+  if (process.env.RENDER_EXTERNAL_URL) return process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '');
+  const proto = req.headers['x-forwarded-proto'] || 'http';
+  const host = req.headers['x-forwarded-host'] || req.headers.host || `${HOST}:${PORT}`;
+  return `${proto}://${host}`;
+}
+
+function isSecure(req) {
+  return (req.headers['x-forwarded-proto'] || '') === 'https';
 }
 
 // ---- single-run state + SSE fanout ----
@@ -199,9 +220,88 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { ok: true });
   }
 
-  // Everything below reads records or spends money: key-gated in hosted mode.
+  // PWA assets are public: the install icon and manifest must load before auth.
+  const staticFile = {
+    '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json'],
+    '/icons/icon-192.png': ['icons/icon-192.png', 'image/png'],
+    '/icons/icon-512.png': ['icons/icon-512.png', 'image/png'],
+    '/icons/apple-touch-icon.png': ['icons/apple-touch-icon.png', 'image/png'],
+  }[u.pathname];
+  if (req.method === 'GET' && staticFile) {
+    try {
+      const data = readFileSync(path.join(__dirname, 'public', staticFile[0]));
+      res.writeHead(200, { 'content-type': staticFile[1], 'cache-control': 'public, max-age=86400' });
+      return res.end(data);
+    } catch {
+      return json(res, 404, { error: 'not found' });
+    }
+  }
+
+  // ---- magic-link auth endpoints (public by nature) ----
+  const cookieAttrs = (v) =>
+    `${auth.COOKIE_NAME}=${v}; Path=/; Max-Age=${Math.floor(auth.SESSION_TTL_MS / 1000)}; HttpOnly; SameSite=Lax${isSecure(req) ? '; Secure' : ''}`;
+
+  if (req.method === 'POST' && u.pathname === '/auth/request') {
+    if (!MAGIC) return json(res, 400, { error: 'Email sign-in is not configured on this deployment.' });
+    let body = '';
+    req.on('data', (c) => (body += c));
+    req.on('end', async () => {
+      let email;
+      try { email = JSON.parse(body).email; } catch { return json(res, 400, { error: 'bad JSON' }); }
+      try {
+        json(res, 200, await auth.requestLink(email, baseUrlFor(req)));
+      } catch (err) {
+        console.error('[auth] send failed:', err.message);
+        json(res, 502, { error: 'Could not send the sign-in email. Try again, or use the access key.' });
+      }
+    });
+    return;
+  }
+
+  if (req.method === 'GET' && u.pathname === '/auth/verify') {
+    const cookieValue = MAGIC ? auth.verifyToken(u.searchParams.get('token')) : null;
+    const ok = !!cookieValue;
+    res.writeHead(ok ? 200 : 400, {
+      'content-type': 'text/html; charset=utf-8',
+      ...(ok ? { 'set-cookie': cookieAttrs(cookieValue) } : {}),
+    });
+    return res.end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Advisory Board</title>
+<body style="font-family:-apple-system,system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 1.2rem;line-height:1.6">
+${ok
+  ? '<h2>Signed in.</h2><p>The console page or app you requested this from signs itself in within a few seconds - you can return to it and close this tab.</p><p>Or continue right here: <a href="/">open the Board Console</a>.</p>'
+  : '<h2>This link is no longer valid.</h2><p>Sign-in links work once and expire after 15 minutes. <a href="/">Request a fresh one.</a></p>'}
+</body>`);
+  }
+
+  if (req.method === 'GET' && u.pathname === '/auth/poll') {
+    if (!MAGIC) return json(res, 400, { status: 'unavailable' });
+    const result = auth.pollRequest(u.searchParams.get('rid'));
+    if (result.status === 'approved') {
+      res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': cookieAttrs(result.cookieValue) });
+      return res.end(JSON.stringify({ status: 'approved', email: result.email }));
+    }
+    return json(res, 200, { status: result.status });
+  }
+
+  if (req.method === 'GET' && u.pathname === '/auth/me') {
+    const email = MAGIC ? auth.sessionEmail(req.headers.cookie) : null;
+    return json(res, 200, { authed: authed(req, u), email, magic: MAGIC, hosted: HOSTED });
+  }
+
+  if (req.method === 'POST' && u.pathname === '/auth/logout') {
+    auth.destroySession(req.headers.cookie);
+    res.writeHead(200, {
+      'content-type': 'application/json',
+      'set-cookie': `${auth.COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${isSecure(req) ? '; Secure' : ''}`,
+    });
+    return res.end(JSON.stringify({ ok: true }));
+  }
+
+  // Everything below reads records or spends money: gated in hosted mode
+  // (session cookie from a magic link, or the access key).
   if (!authed(req, u)) {
-    return json(res, 401, { error: 'unauthorized: this console requires an access key' });
+    return json(res, 401, { error: 'unauthorized: sign in with an authorized email (or provide the access key)' });
   }
 
   if (req.method === 'GET' && u.pathname === '/api/config') {
@@ -296,9 +396,13 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  if (ACCESS_KEY) {
-    console.log(`Advisory Board console: listening on ${HOST}:${PORT} (HOSTED mode - every /api endpoint requires the access key)`);
+  for (const p of auth.configProblems()) console.error(`[auth] WARNING: ${p} - email sign-in disabled`);
+  if (HOSTED) {
+    const modes = [MAGIC ? `magic-link email auth (${auth.allowedEmails().length} authorized address(es))` : null, ACCESS_KEY ? 'access key' : null]
+      .filter(Boolean)
+      .join(' + ');
+    console.log(`Advisory Board console: listening on ${HOST}:${PORT} (HOSTED mode - auth: ${modes})`);
   } else {
-    console.log(`Advisory Board console: http://${HOST}:${PORT}  (local only, no auth; set BOARD_ACCESS_KEY to host publicly; Ctrl-C to stop)`);
+    console.log(`Advisory Board console: http://${HOST}:${PORT}  (local only, no auth; set BOARD_ACCESS_KEY and/or BOARD_ALLOWED_EMAILS to host publicly; Ctrl-C to stop)`);
   }
 });
