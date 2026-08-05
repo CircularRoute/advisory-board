@@ -50,6 +50,24 @@ auth) the single user is the admin.
 
 The console ships a web-app manifest and icons: open the site in the phone browser, then **Add to Home Screen** (iOS Safari: Share → Add to Home Screen; Android Chrome: menu → Add to Home screen / Install). It opens standalone under its own icon, no URL typing. Anyone whose email is on `BOARD_ALLOWED_EMAILS` can install it on their own phone and sign in the same way.
 
+## Making changes remotely
+
+The repo lives on GitHub and Render auto-deploys `main`, so any merged change is
+live in about a minute. Three ways to edit from anywhere:
+
+1. **Claude Code on the web** ([claude.ai/code](https://claude.ai/code)) - connect the
+   GitHub repo once, then ask for changes in plain language from any browser or
+   phone; review the diff and merge.
+2. **@claude in GitHub issues/PRs** - the workflow in `.github/workflows/claude.yml`
+   runs Claude Code on any `@claude` mention (works from the GitHub mobile app) and
+   opens a pull request. Needs the Claude GitHub app installed on the repo and an
+   `ANTHROPIC_API_KEY` Actions secret.
+3. **Hand edits** - press `.` in the repo on github.com for a browser VS Code
+   (github.dev), spin up a Codespace, or use the GitHub mobile app for small edits.
+
+Changes merged to `main` deploy automatically; prefer PRs over direct pushes so a
+bad edit never goes straight to the live console.
+
 ## Hosting on Render
 
 `render.yaml` at the repo root deploys this console as a web service: create a **Blueprint** on render.com pointing at the repo, then set `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` (and `GEMINI_API_KEY` only if you seat Google) in the dashboard. `BOARD_ACCESS_KEY` is auto-generated - copy it from the dashboard; treat it like a password, since anyone holding it can spend your API credit. Runs persist on the attached disk (`BOARD_RUNS_DIR=/var/data/runs`). A run takes minutes; progress streams live, and if the connection drops the finished record is in Past runs.
