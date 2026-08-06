@@ -212,6 +212,19 @@ async function requestLink(rawEmail, baseUrl) {
 // (so the polling console gets its own cookie) AND returns a cookie for the
 // browser that opened the link. Null if invalid/expired; tokens are single
 // use and are spent even when expired.
+// Read-only check for the GET page. Touches NOTHING: email security scanners
+// (Outlook SafeLinks, corporate filters, Apple/Gmail link checking) fetch
+// emailed links before the human ever taps them, so a GET that consumed the
+// token would be burned by a robot and the real click would see "no longer
+// valid". The token is only spent by verifyToken(), which runs on the POST
+// behind the "Complete sign-in" button - scanners fetch, they do not press.
+function tokenValid(token) {
+  if (!token || !HEX64.test(token)) return false;
+  const state = loadState();
+  const entry = state.tokens[sha(token)];
+  return !!(entry && entry.expiresAt >= Date.now());
+}
+
 function verifyToken(token) {
   if (!token || !HEX64.test(token)) return null;
   const state = loadState();
@@ -287,6 +300,7 @@ module.exports = {
   configProblems,
   allowedEmails,
   requestLink,
+  tokenValid,
   verifyToken,
   pollRequest,
   sessionEmail,

@@ -476,20 +476,50 @@ async function handle(req, res) {
     return;
   }
 
+  // The emailed link. This GET must not touch auth state: mail security
+  // scanners (Outlook SafeLinks, corporate filters, Apple/Gmail link checks)
+  // fetch emailed links before the human taps them - a GET that spent the
+  // single-use token would be burned by a robot and the real click would see
+  // "no longer valid". The tap on the button below POSTs; only that spends it.
   if (req.method === 'GET' && u.pathname === '/auth/verify') {
-    const cookieValue = MAGIC ? auth.verifyToken(u.searchParams.get('token')) : null;
-    const ok = !!cookieValue;
-    res.writeHead(ok ? 200 : 400, {
-      'content-type': 'text/html; charset=utf-8',
-      ...(ok ? { 'set-cookie': cookieAttrs(cookieValue) } : {}),
-    });
+    const token = u.searchParams.get('token') || '';
+    const ok = MAGIC && auth.tokenValid(token);
+    res.writeHead(ok ? 200 : 400, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
     return res.end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Advisory Board</title>
+<body style="font-family:-apple-system,system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 1.2rem;line-height:1.6;text-align:center">
+${ok
+  ? `<h2 style="text-align:left">Almost there.</h2>
+<form method="POST" action="/auth/verify" style="margin:26px 0">
+  <input type="hidden" name="token" value="${token.replace(/[^a-f0-9]/gi, '')}">
+  <button type="submit" style="background:#1E824C;color:#fff;border:none;border-radius:12px;padding:15px 34px;font:600 17px -apple-system,system-ui,sans-serif;cursor:pointer">Complete sign-in</button>
+</form>
+<p style="color:#666;font-size:14px;text-align:left">One tap finishes it. The console page or app you requested this from signs itself in within a few seconds of the tap.</p>`
+  : '<h2 style="text-align:left">This link is no longer valid.</h2><p style="text-align:left">Sign-in links work once and expire after 15 minutes - and requesting a new link retires the older ones, so always use the newest email. <a href="/">Request a fresh one.</a></p>'}
+</body>`);
+  }
+
+  if (req.method === 'POST' && u.pathname === '/auth/verify') {
+    let body = '';
+    req.on('data', (c) => (body += c));
+    req.on('end', () => {
+      const token = new URLSearchParams(body).get('token');
+      const cookieValue = MAGIC ? auth.verifyToken(token) : null;
+      const ok = !!cookieValue;
+      res.writeHead(ok ? 200 : 400, {
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': 'no-store',
+        ...(ok ? { 'set-cookie': cookieAttrs(cookieValue) } : {}),
+      });
+      res.end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Advisory Board</title>
 <body style="font-family:-apple-system,system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 1.2rem;line-height:1.6">
 ${ok
   ? '<h2>Signed in.</h2><p>The console page or app you requested this from signs itself in within a few seconds - you can return to it and close this tab.</p><p>Or continue right here: <a href="/">open the Board Console</a>.</p>'
-  : '<h2>This link is no longer valid.</h2><p>Sign-in links work once and expire after 15 minutes. <a href="/">Request a fresh one.</a></p>'}
+  : '<h2>This link is no longer valid.</h2><p>Sign-in links work once and expire after 15 minutes - and requesting a new link retires the older ones, so always use the newest email. <a href="/">Request a fresh one.</a></p>'}
 </body>`);
+    });
+    return;
   }
 
   if (req.method === 'GET' && u.pathname === '/auth/poll') {

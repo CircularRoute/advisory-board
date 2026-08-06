@@ -100,7 +100,13 @@ user is admin.
 - **iOS specifics**: form controls must stay ≥16px on phones (zoom-on-focus); the
   installed PWA has a SEPARATE cookie jar from Safari, which is why sign-in uses the
   poll-for-approval flow (`/auth/request` → emailed link → `/auth/poll` sets the
-  poller's own cookie). Mic (MediaRecorder → `/api/transcribe` →
+  poller's own cookie).
+- **The emailed link's GET must never consume the token** (added 2026-08-05 after a
+  real "link is not valid" report): mail scanners (SafeLinks, corporate filters,
+  Apple/Gmail link checks) fetch emailed links before the human taps. GET
+  /auth/verify is read-only and shows a "Complete sign-in" button; only that
+  button's POST spends the single-use token. Do not "simplify" this back to
+  sign-in-on-GET, and do not add JS auto-submit (some scanners execute JS). Mic (MediaRecorder → `/api/transcribe` →
   gpt-4o-mini-transcribe, whisper-1 fallback) needs https or localhost.
 - **Fable/Opus refusals are member failures by design** - no server-side fallbacks; the
   board's identity guarantees matter more than rescue. Board sits short-handed, loudly.
