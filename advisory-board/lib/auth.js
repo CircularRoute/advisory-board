@@ -92,15 +92,34 @@ const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
 // ---- rate limiting (in-memory; resets on restart, which is fine) ----
 
+// Asking again is normal (the first mail went to spam, the link expired, the
+// phone was elsewhere), so re-sends are allowed freely - throttled only enough
+// to stop someone mail-bombing an authorized address. Two limits:
+//   - a short cooldown between links, so a double-tap does not send twice;
+//   - a ceiling per window, well above ordinary retrying.
+// Checked BEFORE the allowlist, so an unauthorized address is throttled the
+// same way and the responses still reveal nothing about who is authorized.
+const RESEND_COOLDOWN_MS = 20 * 1000;
+const REQUEST_WINDOW_MS = 15 * 60 * 1000;
+const MAX_PER_WINDOW = 8;
+
 const recentRequests = new Map(); // email -> [timestamps]
-function rateLimited(email) {
+// Returns null when the request may proceed, else { waitSec, message }.
+function rateLimitCheck(email) {
   const now = Date.now();
-  const windowMs = 15 * 60 * 1000;
-  const list = (recentRequests.get(email) || []).filter((t) => now - t < windowMs);
-  if (list.length >= 3) return true;
+  const list = (recentRequests.get(email) || []).filter((t) => now - t < REQUEST_WINDOW_MS);
+  const last = list[list.length - 1];
+  if (last && now - last < RESEND_COOLDOWN_MS) {
+    const waitSec = Math.ceil((RESEND_COOLDOWN_MS - (now - last)) / 1000);
+    return { waitSec, message: `A sign-in link was just sent - check your inbox and spam folder. You can ask for another in ${waitSec} seconds.` };
+  }
+  if (list.length >= MAX_PER_WINDOW) {
+    const waitSec = Math.ceil((REQUEST_WINDOW_MS - (now - list[0])) / 1000);
+    return { waitSec, message: `That is a lot of sign-in requests for one address. Try again in ${Math.ceil(waitSec / 60)} minute(s).` };
+  }
   list.push(now);
   recentRequests.set(email, list);
-  return false;
+  return null;
 }
 
 // ---- Brevo transactional email (raw https, no SDK) ----
@@ -155,12 +174,24 @@ async function requestLink(rawEmail, baseUrl) {
   const generic = 'If that address is authorized, a sign-in link is on its way (valid 15 minutes). Leave this page open - it signs itself in when you tap the link.';
   const ok = { message: generic, requestId };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return ok;
-  if (rateLimited(email)) return ok;
+  // A throttled request says so plainly instead of claiming a link is on its
+  // way: silently dropping it is what made a second attempt look broken.
+  const limited = rateLimitCheck(email);
+  // No requestId on a throttled reply: the caller must keep polling the id it
+  // already has, because the link from the previous request is still live and
+  // tapping it must still sign this page in.
+  if (limited) return { message: limited.message, retryAfterSec: limited.waitSec, throttled: true };
   if (!allowedEmails().includes(email)) return ok;
 
   const token = crypto.randomBytes(32).toString('hex');
   const state = loadState();
   const expiresAt = Date.now() + TOKEN_TTL_MS;
+  // Newest link wins: retire this address's earlier links and the pages
+  // waiting on them. Otherwise a second request leaves two live links, and
+  // tapping the older one signs in that tab while the page that asked for the
+  // newer one polls forever - looking, again, like nothing was sent.
+  for (const [k, v] of Object.entries(state.tokens)) if (v.email === email) delete state.tokens[k];
+  for (const [k, v] of Object.entries(state.pending)) if (v.email === email && !v.approved) delete state.pending[k];
   state.tokens[sha(token)] = { email, rid: sha(requestId), expiresAt };
   state.pending[sha(requestId)] = { email, approved: false, expiresAt };
   saveState(state);

@@ -464,15 +464,21 @@
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'request failed');
       $('loginMsg').textContent = d.message;
-      clearInterval(pollTimer);
-      const pollStart = Date.now();
-      pollTimer = setInterval(async () => {
-        if (Date.now() - pollStart > 16 * 60 * 1000) { clearInterval(pollTimer); return; }
-        try {
-          const p = await (await fetch('/auth/poll?rid=' + encodeURIComponent(d.requestId))).json();
-          if (p.status === 'approved') { clearInterval(pollTimer); location.reload(); }
-        } catch { /* transient network error - keep polling */ }
-      }, 3000);
+      // A throttled reply carries no request id - the previous link is still
+      // valid, so keep the poll that is already running rather than switching
+      // to an id nothing will ever approve.
+      if (d.requestId) {
+        $('loginSend').textContent = 'Send another link';
+        clearInterval(pollTimer);
+        const pollStart = Date.now();
+        pollTimer = setInterval(async () => {
+          if (Date.now() - pollStart > 16 * 60 * 1000) { clearInterval(pollTimer); return; }
+          try {
+            const p = await (await fetch('/auth/poll?rid=' + encodeURIComponent(d.requestId))).json();
+            if (p.status === 'approved') { clearInterval(pollTimer); location.reload(); }
+          } catch { /* transient network error - keep polling */ }
+        }, 3000);
+      }
     } catch (err) {
       $('loginMsg').textContent = 'Error: ' + err.message;
     }
