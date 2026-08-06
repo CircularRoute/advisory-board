@@ -970,7 +970,20 @@
     $('configGrid').style.display = '';
     render(); refreshRuns();
   }
-  $('backBtn').addEventListener('click', closeSession);
+  // "Ask another question" starts clean: the answered question and its
+  // attachment are done with, and re-convening on a stale attachment would
+  // quietly bill for context the asker thought they had removed. The error
+  // path calls closeSession() directly instead, so a failed start keeps the
+  // question the user just typed.
+  $('backBtn').addEventListener('click', () => {
+    $('q').value = '';
+    state.context = null;
+    $('ctxFile').value = '';
+    $('banners').innerHTML = '';
+    renderCtx();
+    closeSession();
+    window.scrollTo({ top: 0 });
+  });
   function feed(line) {
     const el = $('sFeed');
     el.textContent += line + '\n';
