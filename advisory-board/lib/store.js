@@ -34,20 +34,34 @@ function costTable(cost) {
   return lines.join('\n');
 }
 
-function renderReport(run) {
+// The on-disk report keeps everything. The emailed edition drops money:
+// the header cost line, the cost table, and the one cost-related warning the
+// engine emits (the Gemini out-of-pocket note - every other warning is about
+// board integrity and must survive). It also drops the run.json pointer, which
+// names a directory the email's recipient has no access to.
+function renderReport(run, { omitCost = false } = {}) {
   const lb = run.leaderboard.entries
     .map((e, i) => `${i + 1}. ${e.member} - avg position ${e.avgPosition === null ? 'n/a (no parsed votes)' : e.avgPosition.toFixed(2)} (${e.votes} vote${e.votes === 1 ? '' : 's'})`)
     .join('\n');
+  const shortHanded = run.failedMembers.length
+    ? `\n**RAN SHORT-HANDED** - failed members: ${run.failedMembers.map((m) => m.seatName || m.model).join(', ')}`
+    : '';
+  const costLine = omitCost
+    ? shortHanded.replace(/^\n/, '')
+    : `**Cost: ${fmtUsd(run.cost.totalUsd)}** (prepaid ${fmtUsd(run.cost.prepaidUsd)}, out-of-pocket ${fmtUsd(run.cost.outOfPocketUsd)})${shortHanded}`;
+  const warnings = omitCost
+    ? run.warnings.filter((w) => !/OUT-OF-POCKET/i.test(w))
+    : run.warnings;
   return `# Advisory Board - ${run.title}
 
 **Tier: ${run.tier.toUpperCase()}${run.mixedTier ? ' (mixed-tier board)' : ''}** | Board: ${run.members.map((m) => `${m.seatName || m.model}${m.memberTier && m.memberTier !== run.tier ? ` [${m.memberTier}]` : ''}`).join(' + ')} | Chairman: ${run.chairman.model} (${run.chairman.source}${run.chairman.isSittingMember ? '; SITTING MEMBER - known bias risk' : '; not a sitting member'})
-**Cost: ${fmtUsd(run.cost.totalUsd)}** (prepaid ${fmtUsd(run.cost.prepaidUsd)}, out-of-pocket ${fmtUsd(run.cost.outOfPocketUsd)})${run.failedMembers.length ? `\n**RAN SHORT-HANDED** - failed members: ${run.failedMembers.map((m) => m.seatName || m.model).join(', ')}` : ''}
+${costLine}
 
 ## Question
 
 ${run.question}
 ${run.context ? `
-**Context attached:** ${run.context.name} (${run.context.chars.toLocaleString('en-US')} characters) - every member, reviewer and the chairman received it with the question. Full text in run.json.
+**Context attached:** ${run.context.name} (${run.context.chars.toLocaleString('en-US')} characters) - every member, reviewer and the chairman received it with the question.${omitCost ? '' : ' Full text in run.json.'}
 ` : ''}
 
 ## Final answer (Chairman synthesis)
@@ -57,15 +71,13 @@ ${run.finalAnswer}
 ## Per-run leaderboard (${run.leaderboard.confidence === 'normal' ? 'blind peer ranking' : 'confidence: ' + run.leaderboard.confidence})
 
 ${lb}
-
+${omitCost ? '' : `
 ## Cost
 
 ${costTable(run.cost)}
-
-${run.warnings.length ? `## Warnings\n\n${run.warnings.map((w) => `- ${w}`).join('\n')}\n` : ''}
----
-Full record (verbatim opinions, blind reviews, de-anonymised label mappings, call ledger): run.json in this directory.
-Chairman anonymisation: ${run.chairmanView.note}
+`}
+${warnings.length ? `## Warnings\n\n${warnings.map((w) => `- ${w}`).join('\n')}\n` : ''}---
+${omitCost ? '' : `Full record (verbatim opinions, blind reviews, de-anonymised label mappings, call ledger): run.json in this directory.\n`}Chairman anonymisation: ${run.chairmanView.note}
 `;
 }
 

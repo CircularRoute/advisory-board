@@ -78,7 +78,6 @@ async function sendDecisionsPdf({ to, run, reportMarkdown }) {
 
   const when = longDate(run.finishedAt);
   const members = (run.members || []).map((m) => m.seatName || m.model);
-  const cost = run.cost ? `$${run.cost.totalUsd.toFixed(2)}` : null;
   const subtitle = [
     `Convened ${when}`,
     `${members.length}-member ${run.tier} board`,
@@ -96,7 +95,6 @@ async function sendDecisionsPdf({ to, run, reportMarkdown }) {
   const summaryBits = [
     `Board: ${members.join(', ')}`,
     run.chairman ? `Chairman: ${run.chairman.model}` : null,
-    cost ? `Cost of this meeting: ${cost}` : null,
     (run.failedMembers || []).length ? `Ran short-handed: ${run.failedMembers.map((m) => m.seatName || m.model).join(', ')} did not answer.` : null,
     run.context ? `Context attached to the question: ${run.context.name}` : null,
   ].filter(Boolean);

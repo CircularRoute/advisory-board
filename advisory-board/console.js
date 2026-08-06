@@ -155,7 +155,9 @@ async function deliverDecisions(run, tier) {
     return;
   }
   try {
-    const sent = await mailer.sendDecisionsPdf({ to, run, reportMarkdown: renderReport(run) });
+    // The emailed edition carries no money talk (omitCost); the on-disk report
+    // and the console keep the full cost record.
+    const sent = await mailer.sendDecisionsPdf({ to, run, reportMarkdown: renderReport(run, { omitCost: true }) });
     console.log(`[mail] decisions PDF -> ${sent.to} (${Math.round(sent.bytes / 1024)} KB)`);
     broadcast({ type: 'engine', tier, e: { t: 'mail-sent', to: sent.to } });
   } catch (err) {
