@@ -29,7 +29,7 @@ console, magic-link auth + PWA, extended boards with roles, live session screen)
   - `lib/pdf.js` - dependency-free PDF writer (base-14 fonts, real Helvetica
     metrics, A4 pagination) that renders the report Markdown into the decision
     document. `lib/mailer.js` - Brevo send with attachment; every completed run is
-    emailed to the asker as "Decisions of the Advisory Board Meeting".
+    emailed to the asker as "Decisions of the Advisory Board".
   - `lib/context.js` - "+ Add Context" attachments: .md/.txt read directly, PDFs
     transcribed by claude-haiku-4-5 via Anthropic document support (a hand-rolled
     PDF parser would silently produce garbage on CID fonts - wrong context is worse

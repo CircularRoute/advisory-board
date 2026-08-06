@@ -10,7 +10,7 @@ const https = require('node:https');
 const { envSecret } = require('./config');
 const { markdownToPdf } = require('./pdf');
 
-const DOC_TITLE = 'Decisions of the Advisory Board Meeting';
+const DOC_TITLE = 'Decisions of the Advisory Board';
 
 function config() {
   return {

@@ -1097,7 +1097,7 @@
     if (e.t === 'title') feed(P + 'Filed as: ' + e.title);
     if (e.t === 'mail-sent') {
       feed(P + 'Decisions PDF emailed to ' + e.to);
-      $('sResults').insertAdjacentHTML('afterbegin', '<div class="banner ok">📄 <b>Decisions of the Advisory Board Meeting</b> has been emailed to ' + esc(e.to) + ' as a PDF.</div>');
+      $('sResults').insertAdjacentHTML('afterbegin', '<div class="banner ok">📄 <b>Decisions of the Advisory Board</b> has been emailed to ' + esc(e.to) + ' as a PDF.</div>');
     }
     if (e.t === 'mail-failed') {
       feed(P + '⚠ could not email the decisions PDF: ' + e.error);
