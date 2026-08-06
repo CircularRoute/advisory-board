@@ -20,7 +20,8 @@ const path = require('node:path');
 
 const { loadKeys, TIERS, DEFAULT_TIER, DEFAULT_PROVIDERS, EXTENDED_SEAT_PROVIDERS } = require('./lib/config');
 const { convene, ROLES } = require('./lib/council');
-const { saveRun, RUNS_DIR } = require('./lib/store');
+const { saveRun, renderReport, RUNS_DIR } = require('./lib/store');
+const mailer = require('./lib/mailer');
 const { extractContext, MAX_BYTES: MAX_CONTEXT_BYTES, MAX_CHARS: MAX_CONTEXT_CHARS } = require('./lib/context');
 const auth = require('./lib/auth');
 
@@ -143,6 +144,26 @@ No final answer was produced${seats.some((s) => s.opinion === 'done') ? ' (indiv
   return dir;
 }
 
+// Emails the finished deliberation as "Decisions of the Advisory Board
+// Meeting" (PDF) to the address that convened it. Silent no-op when the run
+// was convened locally or by access key - there is no person to write to.
+async function deliverDecisions(run, tier) {
+  const to = run.askedBy;
+  if (!mailer.looksLikeEmail(to)) return;
+  if (!mailer.isEnabled()) {
+    broadcast({ type: 'engine', tier, e: { t: 'mail-skipped', reason: 'Email delivery is not configured on this deployment.' } });
+    return;
+  }
+  try {
+    const sent = await mailer.sendDecisionsPdf({ to, run, reportMarkdown: renderReport(run) });
+    console.log(`[mail] decisions PDF -> ${sent.to} (${Math.round(sent.bytes / 1024)} KB)`);
+    broadcast({ type: 'engine', tier, e: { t: 'mail-sent', to: sent.to } });
+  } catch (err) {
+    console.error('[mail] could not send the decisions PDF:', err.message);
+    broadcast({ type: 'engine', tier, e: { t: 'mail-failed', to, error: err.message } });
+  }
+}
+
 async function startRun(opts) {
   running = true;
   broadcast({ type: 'started', at: new Date().toISOString(), opts: { tier: opts.tier, providers: opts.providers, compare: opts.compare } });
@@ -177,6 +198,9 @@ async function startRun(opts) {
       run.askedBy = opts.askedBy || null; // who convened this board (admin history)
       const dir = saveRun(run);
       broadcast({ type: 'run-done', tier, dir: path.basename(dir) });
+      // Mail the decision document to whoever asked. Best-effort by design:
+      // the run is already saved, so a mail failure is reported, never fatal.
+      await deliverDecisions(run, tier);
       results.push({ tier, dir: path.basename(dir), run });
     }
     broadcast({

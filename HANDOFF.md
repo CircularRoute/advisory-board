@@ -26,6 +26,10 @@ console, magic-link auth + PWA, extended boards with roles, live session screen)
     structured `onEvent` stream for the live UI. The no-role state is labeled "Default"
     in the UI (renamed from "Objective", 2026-08-05).
   - `lib/auth.js` - magic-link email auth (Brevo), sessions, admin check.
+  - `lib/pdf.js` - dependency-free PDF writer (base-14 fonts, real Helvetica
+    metrics, A4 pagination) that renders the report Markdown into the decision
+    document. `lib/mailer.js` - Brevo send with attachment; every completed run is
+    emailed to the asker as "Decisions of the Advisory Board Meeting".
   - `lib/context.js` - "+ Add Context" attachments: .md/.txt read directly, PDFs
     transcribed by claude-haiku-4-5 via Anthropic document support (a hand-rolled
     PDF parser would silently produce garbage on CID fonts - wrong context is worse
@@ -101,6 +105,10 @@ user is admin.
 - **Fable/Opus refusals are member failures by design** - no server-side fallbacks; the
   board's identity guarantees matter more than rescue. Board sits short-handed, loudly.
 - **One run at a time** (409 on concurrent convene) - deliberate, it spends money.
+- **Decision emails are best-effort and never fatal**: the run is saved first, then
+  mailed; failures surface as a banner + `[mail]` log line, not an aborted run.
+  Only real email addresses receive it (a `local` / `access-key` asker is skipped),
+  so locally nothing is sent. Verified live 2026-08-05: Brevo `delivered`.
 - **Attached context goes to EVERY stage** (opinions, peer reviews, chairman) by
   design: reviewers who could not see the briefing would penalise answers that cite
   it. That means context tokens are charged once per seat per stage - the console's
