@@ -299,6 +299,25 @@ function json(res, code, obj) {
   res.writeHead(code, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) });
   res.end(body);
 }
+// Buffer a small JSON/form body with a hard size cap. Over-limit requests get
+// an immediate error response and the rest of the upload is drained, not
+// buffered - /auth/request is unauthenticated, so an unbounded `body += c`
+// would be a free memory sink.
+function readBody(req, res, limit, cb) {
+  let body = '';
+  let over = false;
+  req.on('data', (c) => {
+    if (over) return;
+    if (body.length + c.length > limit) {
+      over = true;
+      json(res, 413, { error: 'request body too large' });
+      req.resume();
+      return;
+    }
+    body += c;
+  });
+  req.on('end', () => { if (!over) cb(body); });
+}
 function listRuns(limit = 25) {
   if (!existsSync(RUNS_DIR)) return { total: 0, runs: [] };
   const all = readdirSync(RUNS_DIR, { withFileTypes: true })
@@ -461,9 +480,7 @@ async function handle(req, res) {
 
   if (req.method === 'POST' && u.pathname === '/auth/request') {
     if (!MAGIC) return json(res, 400, { error: 'Email sign-in is not configured on this deployment.' });
-    let body = '';
-    req.on('data', (c) => (body += c));
-    req.on('end', async () => {
+    readBody(req, res, 4096, async (body) => {
       let email;
       try { email = JSON.parse(body).email; } catch { return json(res, 400, { error: 'bad JSON' }); }
       try {
@@ -500,9 +517,7 @@ ${ok
   }
 
   if (req.method === 'POST' && u.pathname === '/auth/verify') {
-    let body = '';
-    req.on('data', (c) => (body += c));
-    req.on('end', () => {
+    readBody(req, res, 4096, (body) => {
       const token = new URLSearchParams(body).get('token');
       const cookieValue = MAGIC ? auth.verifyToken(token) : null;
       const ok = !!cookieValue;
@@ -615,8 +630,12 @@ ${ok
       size += c.length;
       if (size > MAX_CONTEXT_BYTES && !aborted) {
         aborted = true;
+        chunks.length = 0;
         json(res, 413, { error: 'That file is over the 10 MB limit.' });
-        req.destroy();
+        // Drain the rest instead of destroying the socket: destroy() usually
+        // kills the response in flight and the client sees a network error,
+        // never this message.
+        req.resume();
         return;
       }
       if (!aborted) chunks.push(c);
@@ -645,8 +664,9 @@ ${ok
       size += c.length;
       if (size > 20e6 && !aborted) { // OpenAI caps uploads at 25MB; stop earlier
         aborted = true;
+        chunks.length = 0;
         json(res, 413, { error: 'Recording too large (20MB cap) - keep it under ~2 minutes.' });
-        req.destroy();
+        req.resume(); // drain, don't destroy - the client must see the 413
         return;
       }
       if (!aborted) chunks.push(c);
@@ -666,22 +686,26 @@ ${ok
 
   if (req.method === 'POST' && u.pathname === '/api/run') {
     if (running) return json(res, 409, { error: 'A board is already convened; wait for it to finish.' });
-    let body = '';
-    req.on('data', (c) => (body += c));
-    req.on('end', () => {
+    // Cap sized for the inline context attachment: MAX_CONTEXT_CHARS (200k)
+    // JSON-escaped can approach ~1.2 MB; 2 MB leaves headroom without being a
+    // memory sink.
+    readBody(req, res, 2 * 1024 * 1024, (body) => {
+      // Re-check under the single-threaded event loop: the check above ran
+      // before the body arrived, so two near-simultaneous requests could both
+      // pass it - without this, both would convene and both would spend.
+      if (running) return json(res, 409, { error: 'A board is already convened; wait for it to finish.' });
       let opts;
       try { opts = JSON.parse(body); } catch { return json(res, 400, { error: 'bad JSON' }); }
       if (!opts.question || !String(opts.question).trim()) return json(res, 400, { error: 'A question is required.' });
       if (!Array.isArray(opts.providers) || opts.providers.length < 2) return json(res, 400, { error: 'Seat at least two providers.' });
       const tier = opts.tier && TIERS[opts.tier] ? opts.tier : DEFAULT_TIER;
       const compare = Array.isArray(opts.compare) ? opts.compare.filter((t) => TIERS[t]) : [];
-      // Extended board: 2 roles -> +Claude +GPT (5 members); 4 roles ->
-      // +Claude +GPT +Gemini +Claude (7 members).
+      // Extended board: 3 roles -> +Claude +GPT +Gemini (6 members, two per provider).
       const extendedRoles = Array.isArray(opts.extended) ? opts.extended.map(String) : [];
       let extras = [];
       if (extendedRoles.length) {
         const pattern = EXTENDED_SEAT_PROVIDERS[extendedRoles.length];
-        if (!pattern) return json(res, 400, { error: 'The extended board takes exactly 2 or 4 role assignments.' });
+        if (!pattern) return json(res, 400, { error: 'The extended board takes exactly 3 role assignments (one per extra seat).' });
         for (const r of extendedRoles) if (!ROLES[r]) return json(res, 400, { error: `Unknown role: ${r}` });
         extras = extendedRoles.map((role, i) => ({ provider: pattern[i], role }));
       }

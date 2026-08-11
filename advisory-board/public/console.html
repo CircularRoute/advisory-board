@@ -311,8 +311,7 @@
           <span class="lab">Board size</span>
           <div class="seg" id="sizeSeg">
             <button data-size="3" aria-pressed="true">standard · 3</button>
-            <button data-size="5" aria-pressed="false">extended · 5</button>
-            <button data-size="7" aria-pressed="false">full bench · 7</button>
+            <button data-size="6" aria-pressed="false">extended · 6</button>
           </div>
           <div id="roleFields"></div>
           <div class="hint" id="sizeHint"></div>
@@ -540,7 +539,7 @@
   const PLABEL = { anthropic: 'Anthropic', openai: 'OpenAI', google: 'Gemini' };
   const EST = { opinionIn: 350, opinionOut: 2500, reviewOut: 2000, chairOut: 2800 };
   const ROLE_LIST = cfg.roles || [];
-  const EXT_SEATS = cfg.extendedSeats || { 2: ['anthropic', 'openai'], 4: ['anthropic', 'openai', 'google', 'anthropic'] };
+  const EXT_SEATS = cfg.extendedSeats || { 3: ['anthropic', 'openai', 'google'] };
 
   // defaultProviders entries are "provider" or "provider:tier" (a seat pinned
   // off-tier, e.g. "google:mid" - the default Gemini seat).
@@ -559,7 +558,7 @@
     chair: 'default',
     compare: '',
     size: 3,
-    extRoles: [null, null, null, null],
+    extRoles: [null, null, null],
     context: null,
     running: cfg.running,
   };
@@ -651,8 +650,7 @@
 
   const SIZE_HINTS = {
     3: 'Three default members - one per seated provider.',
-    5: 'Adds a Claude and a GPT seat at the board tier, each with an assigned perspective role. The first three members keep the default perspective.',
-    7: 'Adds a second Claude, GPT and Gemini seat plus a third Claude, each with a role. The first three members keep the default perspective.',
+    6: 'Two members per provider: adds a second Claude, GPT and Gemini seat at the board tier, each with an assigned perspective role. The first three members keep the default perspective.',
   };
 
   function render() {
@@ -721,7 +719,7 @@
     const runBtn = $('runBtn');
     let blocked = null;
     if (base.length < 2) blocked = 'A board needs at least two seated providers.';
-    if (state.size === 7 && !state.seats.google.on) blocked = 'The full bench includes a second Gemini seat - turn the Gemini seat on for a 7-member board.';
+    if (state.size === 6 && !state.seats.google.on) blocked = 'The extended board seats two members per provider, including a second Gemini - turn the Gemini seat on for a 6-member board.';
     if (!blocked && state.size > 3 && state.extRoles.slice(0, state.size - 3).some((r) => !r)) blocked = 'Assign a role to every extended seat before convening.';
     const ros = fullRoster(state.tier);
     for (const m of ros) {
@@ -1207,9 +1205,9 @@
     if (PROVIDERS.includes(cp) && TIERS[ct]) state.chair = qp.get('chairman');
   }
   if (qp.get('compare') && ['mid,top', 'low,mid,top'].includes(qp.get('compare'))) state.compare = qp.get('compare');
-  if (qp.get('size') && [5, 7].includes(+qp.get('size'))) state.size = +qp.get('size');
+  if (qp.get('size') && [6].includes(+qp.get('size'))) state.size = +qp.get('size');
   if (qp.get('roles')) {
-    qp.get('roles').split(',').forEach((r, i) => { if (ROLE_LIST.some((x) => x.key === r) && i < 4) state.extRoles[i] = r; });
+    qp.get('roles').split(',').forEach((r, i) => { if (ROLE_LIST.some((x) => x.key === r) && i < 3) state.extRoles[i] = r; });
   }
   if (qp.get('q')) $('q').value = qp.get('q');
 

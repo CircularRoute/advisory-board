@@ -84,10 +84,10 @@ All IDs verified against each provider's live models endpoint on 2026-08-05. Gem
 
 ## Extended boards and roles
 
-The first three members are objective by default. **Extended · 5** adds a Claude and
-a GPT seat at the board tier; **full bench · 7** adds a second Claude, GPT and Gemini
-seat plus a third Claude. Every extra seat carries a perspective role, chosen per
-seat (base members can optionally take a role too, via the seat's role selector or
+The first three members are objective by default. **Extended · 6** adds one seat
+per provider - a second Claude, GPT and Gemini at the board tier - for two members
+per vendor. Every extra seat carries a perspective role, chosen per seat (base
+members can optionally take a role too, via the seat's role selector or
 `--base-roles=`):
 
 - **Contrarian** - actively searches for flaws, risks, and everything that could fail.
@@ -99,7 +99,7 @@ seat (base members can optionally take a role too, via the seat's role selector 
 - **Neutral Arbiter** - judges arguments strictly on logic and clarity, filtering hype.
 
 The chairman is told which roles sat on the board (never which label held which
-role). CLI: `--extended=contrarian,executor` (5 members) or four roles (7 members).
+role). CLI: `--extended=contrarian,executor,outsider` (three roles, 6 members).
 
 ## The live session
 
