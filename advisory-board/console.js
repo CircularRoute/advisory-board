@@ -66,9 +66,11 @@ const subscribers = new Set();
 // mid-run (phone locked, network blip - EventSource auto-reconnects) gets the
 // full session replayed instead of a frozen screen.
 let journal = [];
+const JOURNAL_MAX = 2000; // runaway backstop; a real run is a few hundred events
 function broadcast(event) {
   if (event.type === 'started') journal = [];
   journal.push(event);
+  if (journal.length > JOURNAL_MAX) journal.shift();
   const line = `data: ${JSON.stringify(event)}\n\n`;
   for (const res of subscribers) res.write(line);
 }
@@ -607,9 +609,13 @@ ${ok
       connection: 'keep-alive',
     });
     res.write(`data: ${JSON.stringify({ type: 'hello', running })}\n\n`);
-    // Reconnecting mid-run (phone unlocked, network back): replay the whole
-    // session so the live screen rebuilds instead of staying frozen.
-    if (running) for (const ev of journal) res.write(`data: ${JSON.stringify(ev)}\n\n`);
+    // Replay the current-or-last run's journal to every connecting client -
+    // NOT only while the run is in progress. A phone that slept through the
+    // finish reconnects after `running` is already false; replaying only
+    // mid-run left that screen saying "synthesising" forever even though the
+    // journal held the 'done' event with the results. The client decides
+    // whether the replay is relevant (it ignores it on a fresh page).
+    if (journal.length) res.write(`data: ${JSON.stringify({ type: 'replay', events: journal })}\n\n`);
     subscribers.add(res);
     const ping = setInterval(() => res.write(': ping\n\n'), 15000);
     req.on('close', () => { clearInterval(ping); subscribers.delete(res); });

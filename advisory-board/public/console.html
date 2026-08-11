@@ -381,7 +381,7 @@
         <div class="step" data-n="3"><span class="stepnum">3</span> Chairman synthesis</div>
       </div>
       <div class="pbar"><div id="pfill"></div></div>
-      <div class="s-patience hint" id="sPatience">In session for <b id="sElapsed">0:00</b>. Big boards deliberate for a while — 10–20 minutes is normal for 5–7 members at board tier. You can lock your phone or leave this screen; the board keeps working on the server and the finished answer is saved to Past sessions.</div>
+      <div class="s-patience hint" id="sPatience">In session for <b id="sElapsed">0:00</b>. Big boards deliberate for a while — 10–20 minutes is normal for a 6-member board at top tier, and a big synthesis can take longer. You can lock your phone or leave this screen; the board keeps working on the server and the finished answer is saved to Past sessions.</div>
       <div id="sMembers"></div>
       <div id="sConsensus"></div>
       <div id="sFeed" aria-live="polite"></div>
@@ -1152,16 +1152,43 @@
   });
 
   // ---------- live events ----------
-  const es = new EventSource('/api/events' + (KEY ? '?key=' + encodeURIComponent(KEY) : ''));
-  es.onmessage = (ev) => {
-    const e = JSON.parse(ev.data);
+  // "Stuck view": the session screen is showing but no results (or error)
+  // ever arrived - the state a phone wakes up in after sleeping through the
+  // finish. A replay or a fresh look at history must resolve it.
+  function stuckView() { return !$('session').hidden && !$('sResults').innerHTML; }
+  function handleEvent(e) {
     if (e.type === 'hello') {
       state.running = e.running;
       if (e.running && $('session').hidden) {
         openSession('(a board is already in session - attaching to the live feed)');
         feed('rejoined mid-session; replaying progress so far');
       }
+      // Nothing running and no journal to replay (the replay message, if any,
+      // follows this hello within the same flush): if the screen is still
+      // waiting after a beat, the run ended while this page slept AND the
+      // server has since restarted - point at history instead of spinning.
+      if (!e.running && stuckView()) {
+        setTimeout(() => {
+          if (!state.running && stuckView()) {
+            feed('⚠ no board is in session - this run finished or was interrupted while the screen was asleep. Its record is in Past sessions below.');
+            stopElapsed(); $('sPatience').hidden = true;
+            $('backBtn').disabled = false;
+            refreshRuns();
+          }
+        }, 2500);
+      }
       render();
+      return;
+    }
+    if (e.type === 'replay') {
+      // The current-or-last run's full journal. Relevant only when a run is
+      // in progress or this page is stuck waiting on one - a fresh page finds
+      // finished runs in Past sessions and must not have a session screen
+      // forced open.
+      if (!state.running && !stuckView()) return;
+      if ($('session').hidden) openSession('(rejoining the board in session)');
+      else { $('sFeed').textContent = ''; }
+      for (const ev of e.events || []) handleEvent(ev);
       return;
     }
     if (e.type === 'engine') { engineEvent(e.tier, e.e); return; }
@@ -1186,7 +1213,22 @@
       state.running = false;
       render(); refreshRuns();
     }
-  };
+  }
+  let es = null;
+  function connectEvents() {
+    if (es) { try { es.close(); } catch { /* already closed */ } }
+    es = new EventSource('/api/events' + (KEY ? '?key=' + encodeURIComponent(KEY) : ''));
+    es.onmessage = (ev) => handleEvent(JSON.parse(ev.data));
+  }
+  connectEvents();
+  // iOS suspends a backgrounded page along with its SSE socket and does not
+  // reliably resume the stream on return. Reconnect on wake whenever the
+  // stream is closed - or whenever this screen is still waiting on a run -
+  // which triggers the server's hello + journal replay and un-sticks the view.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    if (stuckView() || !es || es.readyState === EventSource.CLOSED) connectEvents();
+  });
 
   // URL prefill, so an agent can hand a configured board to the human whose
   // tap on Convene is the spend approval:
