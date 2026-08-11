@@ -107,6 +107,13 @@ const recentRequests = new Map(); // email -> [timestamps]
 // Returns null when the request may proceed, else { waitSec, message }.
 function rateLimitCheck(email) {
   const now = Date.now();
+  // The form is public, so every address ever submitted lands in this map -
+  // sweep fully-expired entries before adding more, or it grows without bound.
+  if (recentRequests.size >= 1000) {
+    for (const [k, v] of recentRequests) {
+      if (!v.some((t) => now - t < REQUEST_WINDOW_MS)) recentRequests.delete(k);
+    }
+  }
   const list = (recentRequests.get(email) || []).filter((t) => now - t < REQUEST_WINDOW_MS);
   const last = list[list.length - 1];
   if (last && now - last < RESEND_COOLDOWN_MS) {

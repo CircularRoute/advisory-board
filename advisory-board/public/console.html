@@ -311,8 +311,7 @@
           <span class="lab">Board size</span>
           <div class="seg" id="sizeSeg">
             <button data-size="3" aria-pressed="true">standard · 3</button>
-            <button data-size="5" aria-pressed="false">extended · 5</button>
-            <button data-size="7" aria-pressed="false">full bench · 7</button>
+            <button data-size="6" aria-pressed="false">extended · 6</button>
           </div>
           <div id="roleFields"></div>
           <div class="hint" id="sizeHint"></div>
@@ -382,7 +381,7 @@
         <div class="step" data-n="3"><span class="stepnum">3</span> Chairman synthesis</div>
       </div>
       <div class="pbar"><div id="pfill"></div></div>
-      <div class="s-patience hint" id="sPatience">In session for <b id="sElapsed">0:00</b>. Big boards deliberate for a while — 10–20 minutes is normal for 5–7 members at board tier. You can lock your phone or leave this screen; the board keeps working on the server and the finished answer is saved to Past sessions.</div>
+      <div class="s-patience hint" id="sPatience">In session for <b id="sElapsed">0:00</b>. Big boards deliberate for a while — 10–20 minutes is normal for a 6-member board at top tier, and a big synthesis can take longer. You can lock your phone or leave this screen; the board keeps working on the server and the finished answer is saved to Past sessions.</div>
       <div id="sMembers"></div>
       <div id="sConsensus"></div>
       <div id="sFeed" aria-live="polite"></div>
@@ -540,7 +539,7 @@
   const PLABEL = { anthropic: 'Anthropic', openai: 'OpenAI', google: 'Gemini' };
   const EST = { opinionIn: 350, opinionOut: 2500, reviewOut: 2000, chairOut: 2800 };
   const ROLE_LIST = cfg.roles || [];
-  const EXT_SEATS = cfg.extendedSeats || { 2: ['anthropic', 'openai'], 4: ['anthropic', 'openai', 'google', 'anthropic'] };
+  const EXT_SEATS = cfg.extendedSeats || { 3: ['anthropic', 'openai', 'google'] };
 
   // defaultProviders entries are "provider" or "provider:tier" (a seat pinned
   // off-tier, e.g. "google:mid" - the default Gemini seat).
@@ -559,7 +558,7 @@
     chair: 'default',
     compare: '',
     size: 3,
-    extRoles: [null, null, null, null],
+    extRoles: [null, null, null],
     context: null,
     running: cfg.running,
   };
@@ -651,8 +650,7 @@
 
   const SIZE_HINTS = {
     3: 'Three default members - one per seated provider.',
-    5: 'Adds a Claude and a GPT seat at the board tier, each with an assigned perspective role. The first three members keep the default perspective.',
-    7: 'Adds a second Claude, GPT and Gemini seat plus a third Claude, each with a role. The first three members keep the default perspective.',
+    6: 'Two members per provider: adds a second Claude, GPT and Gemini seat at the board tier, each with an assigned perspective role. The first three members keep the default perspective.',
   };
 
   function render() {
@@ -721,7 +719,7 @@
     const runBtn = $('runBtn');
     let blocked = null;
     if (base.length < 2) blocked = 'A board needs at least two seated providers.';
-    if (state.size === 7 && !state.seats.google.on) blocked = 'The full bench includes a second Gemini seat - turn the Gemini seat on for a 7-member board.';
+    if (state.size === 6 && !state.seats.google.on) blocked = 'The extended board seats two members per provider, including a second Gemini - turn the Gemini seat on for a 6-member board.';
     if (!blocked && state.size > 3 && state.extRoles.slice(0, state.size - 3).some((r) => !r)) blocked = 'Assign a role to every extended seat before convening.';
     const ros = fullRoster(state.tier);
     for (const m of ros) {
@@ -1154,16 +1152,43 @@
   });
 
   // ---------- live events ----------
-  const es = new EventSource('/api/events' + (KEY ? '?key=' + encodeURIComponent(KEY) : ''));
-  es.onmessage = (ev) => {
-    const e = JSON.parse(ev.data);
+  // "Stuck view": the session screen is showing but no results (or error)
+  // ever arrived - the state a phone wakes up in after sleeping through the
+  // finish. A replay or a fresh look at history must resolve it.
+  function stuckView() { return !$('session').hidden && !$('sResults').innerHTML; }
+  function handleEvent(e) {
     if (e.type === 'hello') {
       state.running = e.running;
       if (e.running && $('session').hidden) {
         openSession('(a board is already in session - attaching to the live feed)');
         feed('rejoined mid-session; replaying progress so far');
       }
+      // Nothing running and no journal to replay (the replay message, if any,
+      // follows this hello within the same flush): if the screen is still
+      // waiting after a beat, the run ended while this page slept AND the
+      // server has since restarted - point at history instead of spinning.
+      if (!e.running && stuckView()) {
+        setTimeout(() => {
+          if (!state.running && stuckView()) {
+            feed('⚠ no board is in session - this run finished or was interrupted while the screen was asleep. Its record is in Past sessions below.');
+            stopElapsed(); $('sPatience').hidden = true;
+            $('backBtn').disabled = false;
+            refreshRuns();
+          }
+        }, 2500);
+      }
       render();
+      return;
+    }
+    if (e.type === 'replay') {
+      // The current-or-last run's full journal. Relevant only when a run is
+      // in progress or this page is stuck waiting on one - a fresh page finds
+      // finished runs in Past sessions and must not have a session screen
+      // forced open.
+      if (!state.running && !stuckView()) return;
+      if ($('session').hidden) openSession('(rejoining the board in session)');
+      else { $('sFeed').textContent = ''; }
+      for (const ev of e.events || []) handleEvent(ev);
       return;
     }
     if (e.type === 'engine') { engineEvent(e.tier, e.e); return; }
@@ -1188,7 +1213,22 @@
       state.running = false;
       render(); refreshRuns();
     }
-  };
+  }
+  let es = null;
+  function connectEvents() {
+    if (es) { try { es.close(); } catch { /* already closed */ } }
+    es = new EventSource('/api/events' + (KEY ? '?key=' + encodeURIComponent(KEY) : ''));
+    es.onmessage = (ev) => handleEvent(JSON.parse(ev.data));
+  }
+  connectEvents();
+  // iOS suspends a backgrounded page along with its SSE socket and does not
+  // reliably resume the stream on return. Reconnect on wake whenever the
+  // stream is closed - or whenever this screen is still waiting on a run -
+  // which triggers the server's hello + journal replay and un-sticks the view.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    if (stuckView() || !es || es.readyState === EventSource.CLOSED) connectEvents();
+  });
 
   // URL prefill, so an agent can hand a configured board to the human whose
   // tap on Convene is the spend approval:
@@ -1207,9 +1247,9 @@
     if (PROVIDERS.includes(cp) && TIERS[ct]) state.chair = qp.get('chairman');
   }
   if (qp.get('compare') && ['mid,top', 'low,mid,top'].includes(qp.get('compare'))) state.compare = qp.get('compare');
-  if (qp.get('size') && [5, 7].includes(+qp.get('size'))) state.size = +qp.get('size');
+  if (qp.get('size') && [6].includes(+qp.get('size'))) state.size = +qp.get('size');
   if (qp.get('roles')) {
-    qp.get('roles').split(',').forEach((r, i) => { if (ROLE_LIST.some((x) => x.key === r) && i < 4) state.extRoles[i] = r; });
+    qp.get('roles').split(',').forEach((r, i) => { if (ROLE_LIST.some((x) => x.key === r) && i < 3) state.extRoles[i] = r; });
   }
   if (qp.get('q')) $('q').value = qp.get('q');
 

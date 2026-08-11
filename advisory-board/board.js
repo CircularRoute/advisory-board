@@ -141,23 +141,22 @@ A provider entry may pin its member to another tier or an exact model
   --tier=top --providers=anthropic,openai,google:gemini-3.5-flash-lite
 
 Extended board (--extended): role-assigned extra seats at the board tier;
-the first three members stay objective. 2 roles seat +Claude +GPT (5-member
-board); 4 roles seat +Claude +GPT +Gemini +Claude (7-member board).
+the first three members stay objective. 3 roles seat +Claude +GPT +Gemini
+(6-member board - two members per provider).
 Roles: contrarian, expansionist, outsider, executor, psychologist,
-tradeoff, arbiter.
-  --extended=contrarian,executor
-  --extended=contrarian,expansionist,outsider,executor
+tradeoff, arbiter, scout, analyst, futurist, economist, advocate.
+  --extended=contrarian,executor,outsider
 
 The base members are objective by default; optionally assign them roles too
 (aligned with --providers, empty slot = objective):
   --base-roles=arbiter,,psychologist`);
     process.exit(opts.help ? 0 : 1);
   }
-  // Extended board: 2 roles -> +Claude +GPT; 4 roles -> +Claude +GPT +Gemini +Claude.
+  // Extended board: 3 roles -> +Claude +GPT +Gemini (6 members, two per provider).
   opts.extras = [];
   if (opts.extended && opts.extended.length) {
     const pattern = EXTENDED_SEAT_PROVIDERS[opts.extended.length];
-    if (!pattern) throw new Error('--extended takes exactly 2 roles (5-member board) or 4 roles (7-member board)');
+    if (!pattern) throw new Error('--extended takes exactly 3 roles (6-member board, one role per extra seat)');
     for (const r of opts.extended) if (!ROLES[r]) throw new Error(`Unknown role "${r}" (valid: ${Object.keys(ROLES).join(', ')})`);
     opts.extras = opts.extended.map((role, i) => ({ provider: pattern[i], role }));
   }
