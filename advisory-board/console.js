@@ -151,7 +151,14 @@ No final answer was produced${seats.some((s) => s.opinion === 'done') ? ' (indiv
 // was convened locally or by access key - there is no person to write to.
 async function deliverDecisions(run, tier) {
   const to = run.askedBy;
-  if (!mailer.looksLikeEmail(to)) return;
+  if (!mailer.looksLikeEmail(to)) {
+    // Never silent: the board was convened with the access key or locally, so
+    // there is no address to send the decision document to. Say so - an
+    // expired sign-in otherwise looks exactly like "email stopped working".
+    broadcast({ type: 'engine', tier, e: { t: 'mail-skipped', reason:
+      `Decision document not emailed: this board was convened ${to === 'access-key' ? 'with the access key (your email sign-in may have expired - sign in again to receive decision documents)' : 'locally'}.` } });
+    return;
+  }
   if (!mailer.isEnabled()) {
     broadcast({ type: 'engine', tier, e: { t: 'mail-skipped', reason: 'Email delivery is not configured on this deployment.' } });
     return;

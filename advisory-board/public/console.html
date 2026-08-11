@@ -1101,6 +1101,10 @@
       feed(P + '⚠ could not email the decisions PDF: ' + e.error);
       $('sResults').insertAdjacentHTML('afterbegin', '<div class="banner err">The decision is saved here, but the PDF could not be emailed to ' + esc(e.to) + ': ' + esc(e.error) + '</div>');
     }
+    if (e.t === 'mail-skipped') {
+      feed(P + 'ℹ ' + e.reason);
+      $('sResults').insertAdjacentHTML('afterbegin', '<div class="banner warn">' + esc(e.reason) + '</div>');
+    }
   }
   // Dev/simulation hooks (generic surface, no auth implications)
   window.__board.engineEvent = engineEvent;
